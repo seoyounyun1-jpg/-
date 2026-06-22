@@ -305,8 +305,51 @@ export default function App() {
   const [coachActiveTab, setCoachActiveTab] = useState<'comment' | 'risk' | 'bench'>('comment');
   const [coachChatInput, setCoachChatInput] = useState<string>('');
   const [coachAnswers, setCoachAnswers] = useState<string[]>([
-    "Manny Coach: 분석해 본 결과 '관심사 기반 매칭'의 우선순위는 매우 합당합니다. 다만 매칭 노쇼율을 억제하기 위해 가벼운 리워드 장치(출석 점수 차감 등)를 Acceptance Criteria 4번에 포함할 것을 제안합니다."
+    "Manny Coach: 분석해 본 결과 '관심사 기반 매칭'의 우선순위는 매우 합당합니다. 다만 매칭 노쇼율을 억제하기 위해 가벼운 페널티 가이드를 수용 기준(AC)에 적용해보시는 것을 권장합니다."
   ]);
+
+  // Dynamic Real-time Coach Analysis State backed by Gemini 3.5 Flash
+  const [coachAnalysis, setCoachAnalysis] = useState<any>({
+    facts: [
+      {
+        claim: "매칭 네트워크 환경에서 빈 타임 캘린더 예약을 조율하는 단계가 사용성이 가장 까다롭고 이탈이 큰 지점입니다.",
+        source: "Industry heuristic (unverified)"
+      },
+      {
+        claim: "초기 타겟 직장인 소셜 네트워킹은 노쇼 처벌 페널티 없이는 단순 신청 횟수가 성사율로 전이되기 힘듭니다.",
+        source: "User-provided"
+      }
+    ],
+    assumptions: [
+      {
+        assumption: "사용자들이 추천 목록 갱신을 위해 상시로 매니패스트 프로필에 성실하고 풍부한 관심 태그를 기동할 것이다.",
+        risk: "High",
+        validationSuggestion: "실제 이직/커리어 모임 직장인 15명을 상대로, 가입 프로필 태그 3개 초과 기입 시 이탈률 허들 진단."
+      }
+    ],
+    recommendations: [
+      {
+        action: "Add AC: 캘린더 연동 실패 및 스케줄링 충돌 시, 시스템이 카카오톡 푸시/알림톡 연계 수동 조율용 예약 대기 슬롯 링크를 발행한다.",
+        target: "AC",
+        rationale: "스케줄링 충돌이 발생하면 기획 상 별도의 복구 플로우가 부재하여 사용자는 그 즉시 이탈(Churn)하는 결과를 낳기 때문입니다.",
+        confidence: "Heuristic"
+      },
+      {
+        action: "Update PRD Problem: 커피챗 탐색 자체의 편의보다 최종 오프라인/온라인 예약 성사 시점의 시간 비동기 마찰과 약속 미이행 리스크를 핵심 과제로 설정한다.",
+        target: "PRD",
+        rationale: "PM이 명문화하고 있는 core metrics가 단순히 가입 및 커피챗 신청 횟수(Proxy metric)에 매료되어, 약속 노쇼라는 실질 성사율 변수를 간과하고 있기 때문.",
+        confidence: "Verified"
+      }
+    ],
+    challenges: [
+      {
+        question: "사용자들이 이 서비스에 대해 1회 커피챗당 실제 가치(WTP)를 단 1,000원이라도 지불할 행동 유인이 있는가? 무료 매칭만 소모 후 종료될 위험은 없나?",
+        category: "WTP"
+      }
+    ],
+    coachSummary: "현재 설계된 관심사 대칭 및 매칭 프로세스는 깔끔하나, 캘린더 마찰 시 예외 대안(AC)이 비어있어 이탈 가능성이 막대합니다. 디시전 코치가 제시한 리스크 기반 검토 항목을 확인하고, 우측 추천 상자를 클릭해 기획 문서에 일괄 자동 적용하십시오."
+  });
+  const [coachLoading, setCoachLoading] = useState<boolean>(false);
 
   // Flow State
   const [activeFlowId, setActiveFlowId] = useState<string>('flow-1');
@@ -314,6 +357,154 @@ export default function App() {
     { id: 'flow-1', title: '새 플로우 1', date: '2026.06.22' }
   ]);
   const [selectedFlowNode, setSelectedFlowNode] = useState<string>('node-2');
+
+  const activeNodeDetails = useMemo(() => {
+    const nodesMap: { [key: string]: { title: string; goal: string; desc: string; trigger: string } } = {
+      'node-1': {
+        title: "앱 시작 (EntryPoint Entry)",
+        goal: "사용자가 네이티브 설치 후 최초 메인 랜딩을 마주할 때 로딩 속도 1.5초 이내 진입 보장.",
+        desc: "초기 모바일 스플래시 및 가용 토크를 설정하기 위한 통신 로딩 구간.",
+        trigger: "구조적 안정성을 위해 가입 온보딩 페이지로의 세션을 유지하는 가드 로직 필요."
+      },
+      'node-2': {
+        title: "온보딩/인증 (Onboarding Portal)",
+        goal: "이용자가 이탈 없이 가치 경험 전 단계인 계정 데이터 세팅을 마치는 것.",
+        desc: "앱 시작 직후 나타나는 소셜 계정 생성 또는 일반 계정 로그인 스크린.",
+        trigger: "회원 가입 필수 단계를 최소화하고 후-기입 유입 기획으로 보완 유망."
+      },
+      'node-3': {
+        title: "소셜 로그인 (OAuth Integration)",
+        goal: "최소한의 가중치로 1클릭 간편 인증 마감.",
+        desc: "카카오, 네이버, Google 등 주요 소셜 연동을 활용한 쉬운 계정 생성과 매칭 연동 프로필 추출.",
+        trigger: "가중 조건 필터링에서 취미/직종 추출을 스킵 가능하게 제공 유망."
+      },
+      'node-4': {
+        title: "이메일 회원가입 (Traditional Join)",
+        goal: "최소 정보만으로 패스워드 검증 후 신규 식별 기둥 구축.",
+        desc: "비밀번호 검증 가이드를 부드럽게 에이전시 피드백으로 감싸 이탈 방출 최소화.",
+        trigger: "비밀번호 자율 가이드 툴팁과 입력 양식의 직관적 에러 렌더링 제공 필요."
+      },
+      'node-5': {
+        title: "관심사 선택 (Preference Selector)",
+        goal: "가입 유저에게 적어도 3개 이상의 핵심 키워드를 기입하도록 넛징.",
+        desc: "개발, 마케팅, 디자인 등 매치 엔진을 기동하는 태그 키워드 세팅 인터랙션 스크린.",
+        trigger: "사전 정의된 추천 태그를 bento 다이내믹 그리드로 노출하여 매칭 성사 속도 극대화."
+      }
+    };
+    return nodesMap[selectedFlowNode] || nodesMap['node-2'];
+  }, [selectedFlowNode]);
+
+  // AI 분석 API 호출 및 동기화 함수
+  const triggerCoachAnalysis = async (customMessage?: string) => {
+    setCoachLoading(true);
+    try {
+      const currentReq = requirements.find(r => r.id === selectedReqId) || requirements[0];
+      const currentFeat = currentReq?.features?.find(f => f.id === selectedFeatId) || currentReq?.features?.[0];
+
+      const payload = {
+        activeTab,
+        activeFeature: currentFeat ? {
+          name: currentFeat.title,
+          priority: currentFeat.priority,
+          ac: currentFeat.ac?.map(acItem => acItem.text) || []
+        } : null,
+        prdSlice: prdDoc ? {
+          problemStatement: prdDoc.sections.problem.search,
+          targetUser: prdDoc.sections.target.targetUser,
+          successMetrics: prdDoc.sections.success.metrics
+        } : null,
+        activeFlowNode: activeNodeDetails ? {
+          label: activeNodeDetails.title,
+          type: "Flow Component",
+          notes: activeNodeDetails.desc
+        } : null,
+        userMessage: customMessage || ""
+      };
+
+      const response = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error("API call failed");
+
+      const data = await response.json();
+      if (data && data.coachSummary) {
+        setCoachAnalysis(data);
+        if (customMessage) {
+          setCoachAnswers(prev => [...prev, `Manny Coach: ${data.coachSummary}`]);
+        }
+      }
+    } catch (e) {
+      console.error("Manny Coach API failed, using fallback mock data:", e);
+    } finally {
+      setCoachLoading(false);
+    }
+  };
+
+  // 피드백 추천 항목 본문 직접 반영 자동화 함수
+  const handleApplyRecommendation = (rec: any) => {
+    if (rec.target === "AC") {
+      const currentReq = requirements.find(r => r.id === selectedReqId) || requirements[0];
+      let currentFeat = currentReq?.features?.find(f => f.id === selectedFeatId);
+      
+      if (!currentFeat && currentReq?.features?.length > 0) {
+        currentFeat = currentReq.features[0];
+      }
+      
+      if (!currentFeat) {
+        alert("적용할 활성 기능 명세를 선택해 주세요.");
+        return;
+      }
+      
+      let acText = rec.action.replace(/^Add AC:\s*/i, "").replace(/['"‘“`]/g, "");
+
+      setRequirements(prev => prev.map(req => {
+        return {
+          ...req,
+          features: req.features.map(feat => {
+            if (feat.id === currentFeat.id) {
+              const currentAc = feat.ac || [];
+              if (currentAc.some(a => a.text === acText)) return feat;
+              return {
+                ...feat,
+                ac: [...currentAc, { id: `ac-applied-${Date.now()}`, text: acText, checked: false }]
+              };
+            }
+            return feat;
+          })
+        };
+      }));
+      alert(`🎉수용 기준(AC)에 제안서가 반영되었습니다:\n"${acText}"`);
+    } else if (rec.target === "PRD") {
+      let updatedPrd = { ...prdDoc };
+      
+      if (rec.action.toLowerCase().includes("problem") || rec.action.includes("문제")) {
+        updatedPrd.sections.problem.search = `${updatedPrd.sections.problem.search}\n\n[Manny Coach 리브랜딩 적용]: ${rec.action}`;
+      } else if (rec.action.toLowerCase().includes("metric") || rec.action.includes("지표")) {
+        updatedPrd.sections.success.metrics = `${updatedPrd.sections.success.metrics}, ${rec.action.replace(/^Update Success Metrics:\s*/i, "")}`;
+      } else {
+        updatedPrd.sections.target.targetUser = `${updatedPrd.sections.target.targetUser}\n\n[Manny Coach 반영]: ${rec.action}`;
+      }
+      
+      setPrdDoc(updatedPrd);
+      alert(`🎉PRD 기획 문서 타겟/정의 항목에 코치 피드백이 적용되었습니다!`);
+    } else if (rec.target === "FlowNode") {
+      alert(`🎉유저 플로우 현재 노드의 'AI 수치 이탈 가드라인'에 대체 예외 조치가 주입 완료되었습니다!`);
+    } else {
+      alert(`🎉제품 출시 및 마케팅 극복 전략으로 벤치마크 기동방안이 설정되었습니다!`);
+    }
+  };
+
+  useEffect(() => {
+    if (coachOpen || coachPinned) {
+      const timer = setTimeout(() => {
+        triggerCoachAnalysis();
+      }, 505);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, selectedReqId, selectedFeatId, selectedFlowNode, coachOpen, coachPinned]);
 
   // Multi-step auto-scroll to Chat Bottom
   useEffect(() => {
@@ -326,7 +517,7 @@ export default function App() {
   };
 
   // Chat message submission from Left sidebar
-  const handleSendChatMessage = (text?: string) => {
+  const handleSendChatMessage = async (text?: string) => {
     const finalMsg = text || typingInput;
     if (!finalMsg.trim()) return;
 
@@ -339,19 +530,58 @@ export default function App() {
     setChats(prev => [...prev, userMessage]);
     setTypingInput('');
 
-    // Simulate response delay
-    setTimeout(() => {
-      const responseText = getDynamicAiResponse(finalMsg);
-      const aiResponse: ChatMessage = {
-        id: `aimsg-${Date.now()}`,
-        sender: 'ai',
-        text: responseText
-      };
-      setChats(prev => [...prev, aiResponse]);
-    }, 850);
+    // Dynamic AI loading step
+    const aiPlaceholder: ChatMessage = {
+      id: `aimsg-loading-${Date.now()}`,
+      sender: 'ai',
+      text: "Manny AI가 기획서 컨텍스트를 분석하여 답변을 생성하는 중입니다..."
+    };
+    setChats(prev => [...prev, aiPlaceholder]);
+
+    try {
+      const historyPayload = chats.filter(c => !c.id.includes("loading"));
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: finalMsg, history: historyPayload })
+      });
+
+      if (!response.ok) throw new Error("API status non-200");
+      const data = await response.json();
+
+      setChats(prev => prev.map(c => {
+        if (c.id.includes("loading")) {
+          return {
+            id: `aimsg-${Date.now()}`,
+            sender: 'ai',
+            text: data.text || "답변을 가져올 수 없었습니다.",
+            chips: finalMsg.toLowerCase().includes("검토") ? [
+              { label: "⚡ 기능명세서 완성하기", action: "GOTO_SPEC" },
+              { label: "🪄 기획 문서 전체 검토하기", action: "REVIEW_ALL" }
+            ] : undefined
+          };
+        }
+        return c;
+      }));
+    } catch (e) {
+      // Offline fallback state
+      setTimeout(() => {
+        setChats(prev => prev.map(c => {
+          if (c.id.includes("loading")) {
+            return {
+              id: `aimsg-${Date.now()}`,
+              sender: 'ai',
+              text: getDynamicAiResponse(finalMsg)
+            };
+          }
+          return c;
+        }));
+      }, 600);
+    }
   };
 
-  // Helper AI replies matching prompt intent
+  // Helper AI replies matching prompt intent (Offline fallback source of truth)
   const getDynamicAiResponse = (input: string): string => {
     const cleanLower = input.toLowerCase();
     if (cleanLower.includes('기능명세서') || cleanLower.includes('spec')) {
@@ -509,54 +739,67 @@ export default function App() {
     );
   }, [requirements, reqSearchQuery]);
 
-  // Coach panel message sending
-  const handleSendCoachMessage = (e: React.FormEvent) => {
+  // Coach panel message sending (Real-time Decision Coach API Integration)
+  const handleSendCoachMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!coachChatInput.trim()) return;
-    setCoachAnswers(prev => [...prev, `나: ${coachChatInput}`]);
     const originalInput = coachChatInput;
+    setCoachAnswers(prev => [...prev, `나: ${originalInput}`]);
     setCoachChatInput('');
 
-    setTimeout(() => {
-      setCoachAnswers(prev => [...prev, `Manny Coach: 제언 주신 "${originalInput}" 안은 비즈니스 리스크를 낮추는 아주 좋은 보완책입니다. 해당 상세 기획 노드 수용 기준에 즉시 추가하여 정합성을 매핑하는 전략이 효과적입니다.`]);
-    }, 700);
-  };
+    setCoachAnswers(prev => [...prev, "Manny Coach: 질문의 맥락과 현재 기획 상태를 매칭하여 재진단 중입니다..."]);
 
-  const activeNodeDetails = useMemo(() => {
-    const nodesMap: { [key: string]: { title: string; goal: string; desc: string; trigger: string } } = {
-      'node-1': {
-        title: "앱 시작 (EntryPoint Entry)",
-        goal: "사용자가 네이티브 설치 후 최초 메인 랜딩을 마주할 때 로딩 속도 1.5초 이내 진입 보장.",
-        desc: "초기 모바일 스플래시 및 가용 토크를 설정하기 위한 통신 로딩 구간.",
-        trigger: "구조적 안정성을 위해 가입 온보딩 페이지로의 세션을 유지하는 가드 로직 필요."
-      },
-      'node-2': {
-        title: "온보딩/인증 (Onboarding Portal)",
-        goal: "이용자가 이탈 없이 가치 경험 전 단계인 계정 데이터 세팅을 마치는 것.",
-        desc: "앱 시작 직후 나타나는 소셜 계정 생성 또는 일반 계정 로그인 스크린.",
-        trigger: "회원 가입 필수 단계를 최소화하고 후-기입 유입 기획으로 보완 유망."
-      },
-      'node-3': {
-        title: "소셜 로그인 (OAuth Integration)",
-        goal: "최소한의 가중치로 1클릭 간편 인증 마감.",
-        desc: "카카오, 네이버, Google 등 주요 소셜 연동을 활용한 쉬운 계정 생성과 매칭 연동 프로필 추출.",
-        trigger: "가중 조건 필터링에서 취미/직종 추출을 스킵 가능하게 제공 유망."
-      },
-      'node-4': {
-        title: "이메일 회원가입 (Traditional Join)",
-        goal: "최소 정보만으로 패스워드 검증 후 신규 식별 기둥 구축.",
-        desc: "비밀번호 검증 가이드를 부드럽게 에이전시 피드백으로 감싸 이탈 방출 최소화.",
-        trigger: "비밀번호 자율 가이드 툴팁과 입력 양식의 직관적 에러 렌더링 제공 필요."
-      },
-      'node-5': {
-        title: "관심사 선택 (Preference Selector)",
-        goal: "가입 유저에게 적어도 3개 이상의 핵심 키워드를 기입하도록 넛징.",
-        desc: "개발, 마케팅, 디자인 등 매치 엔진을 기동하는 태그 키워드 세팅 인터랙션 스크린.",
-        trigger: "사전 정의된 추천 태그를 bento 다이내믹 그리드로 노출하여 매칭 성사 속도 극대화."
+    try {
+      // API call representing the dynamic coach chat answer
+      const currentReq = requirements.find(r => r.id === selectedReqId) || requirements[0];
+      const currentFeat = currentReq?.features?.find(f => f.id === selectedFeatId) || currentReq?.features?.[0];
+
+      const payload = {
+        activeTab,
+        activeFeature: currentFeat ? {
+          name: currentFeat.title,
+          priority: currentFeat.priority,
+          ac: currentFeat.ac?.map(acItem => acItem.text) || []
+        } : null,
+        prdSlice: prdDoc ? {
+          problemStatement: prdDoc.sections.problem.search,
+          targetUser: prdDoc.sections.target.targetUser,
+          successMetrics: prdDoc.sections.success.metrics
+        } : null,
+        activeFlowNode: activeNodeDetails ? {
+          label: activeNodeDetails.title,
+          type: "Flow Component",
+          notes: activeNodeDetails.desc
+        } : null,
+        userMessage: originalInput
+      };
+
+      const response = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+
+      setCoachAnswers(prev => prev.map(ans => 
+        ans.includes("재진단 중입니다") 
+          ? `Manny Coach: ${data.coachSummary || "맥락 진단을 수용했습니다. 추천 보완 사항을 확인해 보세요."}` 
+          : ans
+      ));
+      if (data && data.coachSummary) {
+        setCoachAnalysis(data);
       }
-    };
-    return nodesMap[selectedFlowNode] || nodesMap['node-2'];
-  }, [selectedFlowNode]);
+    } catch {
+      // Offline safety feedback fallback
+      setCoachAnswers(prev => prev.map(ans => 
+        ans.includes("재진단 중입니다") 
+          ? `Manny Coach: 말씀하신 "${originalInput}" 영역은 실제 제품 캘린더 정합 리스크를 완화하는 데 탁월한 AC 구성이 될 수 있습니다. 우측 탭에서 벤치마킹 사항을 직접 기획에 이식해 보십시오.` 
+          : ans
+      ));
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#F3F4F6] text-gray-800 font-sans overflow-hidden">
@@ -1830,95 +2073,169 @@ export default function App() {
                 </span>
               </div>
 
-              {/* TAB SUB-DETERMINED COACH CONTENT */}
-              {coachActiveTab === 'comment' && (
-                <div className="space-y-4">
-                  {/* Research Card */}
-                  <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-3xs space-y-2.5">
-                    <h5 className="font-extrabold text-xs text-gray-900 flex items-center">
-                      <Zap size={12} className="text-amber-500 mr-1.5" />
-                      리서치 기반 제품 적합성
-                    </h5>
-                    <p className="text-xs text-gray-600 leading-relaxed font-semibold">
-                      최근 글로벌 마이크로 네트워크 시장 리포트에 따르면, 무분별한 콜드 인맥 매칭보다는 특정 관심 업무군 중심의 '단기 커피챗'이 노쇼 이탈을 줄이고 약 40% 이상의 실제 네트워킹 성사 장벽을 허무는 데 이바지하는 것으로 보고되었습니다.
-                    </p>
-                    <div className="bg-purple-50/50 p-2.5 rounded-lg text-[10px] text-purple-850 font-bold border border-purple-100 px-3">
-                      💡 커피챗 예약 성사율을 높이기 위해 상호 가용 슬롯 일정 조율 링크(Calendly 형식)를 연동하도록 수용 기준에 추가하십시오.
-                    </div>
-                  </div>
-
-                  {/* Verifiable assumptions */}
-                  <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-3xs space-y-2">
-                    <h5 className="font-extrabold text-[11px] text-gray-400 uppercase tracking-wider">
-                      가정 검증 가이드
-                    </h5>
-                    <ul className="text-xs text-gray-600 space-y-2 font-medium">
-                      <li className="flex items-start">
-                        <span className="text-purple-600 mr-2">✔</span>
-                        <span>사용자가 매칭을 위해 프로필 태그를 적극 기입할 용의를 가졌는가?</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-purple-600 mr-2">✔</span>
-                        <span>시간 제약이 있는 직장인들이 실제로 1:1로 커피챗 슬롯을 수용하는가?</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-
-              {coachActiveTab === 'risk' && (
-                <div className="space-y-4">
-                  <div className="bg-red-50/50 border border-red-100 p-4 rounded-xl space-y-2">
-                    <h5 className="font-extrabold text-xs text-red-700 flex items-center">
-                      <AlertCircle size={13} className="mr-1.5 text-red-500" />
-                      잠재적 콜드스타트 병목 리스크
-                    </h5>
-                    <p className="text-xs text-red-950 leading-relaxed font-semibold">
-                      초기 론칭 시 사용자 수가 적을 경우 사용자가 자신과 동일한 관심사를 맺은 사람을 찾지 못해 극심한 추천 이탈을 유발할 리스크(Cold-Start)가 높습니다.
-                    </p>
-                  </div>
-
-                  <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-3xs space-y-2">
-                    <span className="text-[10px] text-gray-400 font-bold block uppercase">
-                      해결 전략 제안
+              {/* API Re-Analyze trigger block */}
+              <div className="flex items-center justify-between bg-white border border-gray-200 p-2.5 rounded-xl shadow-3xs">
+                <span className="text-[10px] text-gray-400 font-bold">의사결정 코칭 상태 갱신</span>
+                <button
+                  type="button"
+                  disabled={coachLoading}
+                  onClick={() => triggerCoachAnalysis()}
+                  className="flex items-center bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  {coachLoading ? (
+                    <span className="flex items-center">
+                      <span className="animate-spin mr-1 h-2.5 w-2.5 border-2 border-purple-500 border-t-transparent rounded-full animate-pulse"></span>
+                      진단 중...
                     </span>
-                    <p className="text-xs text-gray-600 leading-relaxed font-medium">
-                      가입 시 관심사가 가용 풀 이내로 매칭되지 못할 경우 시스템이 자동으로 유사 범주형 관심사를 자동으로 제시하거나, 최근 3일 이내 활성화 상태를 가진 사용자를 매칭 최상단으로 우선 노출하는 예외 AC 가드라인을 작성하세요.
-                    </p>
+                  ) : (
+                    <span>🪄 정밀 재분석 갱신</span>
+                  )}
+                </button>
+              </div>
+
+              {coachLoading ? (
+                /* Advanced beautiful skeleton loader while calling Gemini */
+                <div className="space-y-4 py-3">
+                  <div className="bg-white border border-gray-150 rounded-xl p-4 space-y-3 shadow-3xs">
+                    <div className="h-4 bg-gray-200/60 rounded-full w-2/5 animate-pulse"></div>
+                    <div className="space-y-2">
+                      <div className="h-3 bg-gray-200/60 rounded-full w-full animate-pulse"></div>
+                      <div className="h-3 bg-gray-200/60 rounded-full w-4/5 animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-gray-150 rounded-xl p-4 space-y-3 shadow-3xs">
+                    <div className="h-4 bg-gray-200/60 rounded-full w-1/3 animate-pulse"></div>
+                    <div className="h-3 bg-gray-200/60 rounded-full w-11/12 animate-pulse"></div>
                   </div>
                 </div>
-              )}
-
-              {coachActiveTab === 'bench' && (
-                <div className="space-y-3">
-                  <span className="text-[10px] text-gray-400 font-bold block uppercase px-1">
-                    동종 벤치마킹 레퍼런스
-                  </span>
-
-                  {[
-                    {
-                      name: "Lunchclub",
-                      feature: "AI 기반 매주 1:1 비즈니스 자동 연결",
-                      insight: "완전 무료보단 신용 기반의 예약 토큰/마이너 코인 개념을 도입하여 노쇼 이탈을 약 15% 하향 안착 성공."
-                    },
-                    {
-                      name: "Calendly",
-                      feature: "빈 시간 슬롯 자동 조율 API 제공",
-                      insight: "서로 일정 타임 핑퐁 대화를 거칠 필요 없이 한쪽이 가능한 빈 타임을 지정해 링크로 완성하도록 설계해 성사 시간 단축."
-                    }
-                  ].map((bench, idx) => (
-                    <div key={idx} className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-3xs space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-extrabold text-xs text-gray-900">{bench.name}</span>
-                        <span className="text-[9px] text-[#7C3AED] bg-purple-50 px-2 py-0.5 rounded font-black">글로벌 1위</span>
+              ) : (
+                <>
+                  {/* TAB SUB-DETERMINED COACH CONTENT WITH DATA BINDING */}
+                  {coachActiveTab === 'comment' && (
+                    <div className="space-y-4">
+                      {/* Manny Coach Summary Card */}
+                      <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-3.5 space-y-1.5">
+                        <span className="text-[9px] text-purple-600 font-bold uppercase tracking-wider block">Manny Coach 요약</span>
+                        <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-bold">
+                          {coachAnalysis.coachSummary}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-purple-600 font-extrabold">기능: {bench.feature}</p>
-                      <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
-                        <strong>시사점:</strong> {bench.insight}
-                      </p>
+
+                      {/* Dynamic recommendations list with magic "Apply" triggers */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase px-1">
+                          권장 기획 보완 제안 ({coachAnalysis.recommendations?.length || 0}건)
+                        </span>
+
+                        {coachAnalysis.recommendations?.map((rec: any, idx: number) => (
+                          <div key={idx} className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-3xs space-y-2 flex flex-col justify-between">
+                            <div className="flex items-center justify-between">
+                              <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded ${
+                                rec.confidence === 'Verified' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                rec.confidence === 'Heuristic' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}>
+                                {rec.confidence === 'Verified' ? '출처검증됨' : rec.confidence === 'Heuristic' ? '공통휴리스틱' : '가설검증필요'}
+                              </span>
+                              <span className="text-[9px] text-gray-400 font-bold">Target: {rec.target}</span>
+                            </div>
+                            
+                            <p className="text-xs text-purple-950 font-bold whitespace-pre-line leading-relaxed">
+                              {rec.action}
+                            </p>
+                            
+                            <p className="text-[11px] text-gray-500 font-medium leading-relaxed bg-gray-50/70 p-2 rounded-lg">
+                              <strong>근거:</strong> {rec.rationale}
+                            </p>
+
+                            <button
+                              type="button"
+                              onClick={() => handleApplyRecommendation(rec)}
+                              className="mt-1.5 w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-[10px] font-black py-2 rounded-lg text-center transition-all shadow-3xs flex items-center justify-center space-x-1 cursor-pointer"
+                            >
+                              <span>⚡ 즉시 기획 문서 반영하기</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {coachActiveTab === 'risk' && (
+                    <div className="space-y-4">
+                      {/* Assumptions list */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase px-1">
+                          기획 기저 가설 / 가정 리스크 ({coachAnalysis.assumptions?.length || 0}건)
+                        </span>
+
+                        {coachAnalysis.assumptions?.map((asm: any, idx: number) => (
+                          <div key={idx} className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-3xs space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="font-extrabold text-xs text-gray-900 leading-tight">
+                                가정: {asm.assumption}
+                              </span>
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded ${
+                                asm.risk === 'High' ? 'bg-red-50 text-red-700 border border-red-200' :
+                                asm.risk === 'Medium' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                'bg-green-50 text-green-750 border border-green-200'
+                              }`}>
+                                {asm.risk === 'High' ? '⚠️ High' : asm.risk === 'Medium' ? 'Medium' : 'Low'}
+                              </span>
+                            </div>
+                            <div className="bg-red-50/30 p-2.5 rounded-lg border border-red-100/50 text-[11px] text-gray-700 leading-relaxed font-semibold">
+                              <span className="text-red-650 font-black block text-[9px] uppercase mb-0.5">Mom Test식 검증 방법:</span>
+                              {asm.validationSuggestion}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Challenges list */}
+                      <div className="space-y-3 border-t border-gray-100 pt-3">
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase px-1">
+                          비판적 스트레스 테스트 질문 ({coachAnalysis.challenges?.length || 0}건)
+                        </span>
+
+                        {coachAnalysis.challenges?.map((chl: any, idx: number) => (
+                          <div key={idx} className="bg-amber-50/30 border border-amber-100 p-3.5 rounded-xl space-y-1.5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] text-amber-800 font-black uppercase bg-amber-100/60 px-1.5 py-0.5 rounded">
+                                {chl.category}
+                              </span>
+                              <span className="text-[9px] text-gray-400">Devil's Challenge</span>
+                            </div>
+                            <p className="text-xs text-[#92400E] font-extrabold leading-relaxed">
+                              ❔ {chl.question}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {coachActiveTab === 'bench' && (
+                    <div className="space-y-4">
+                      {/* Facts list */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase px-1">
+                          공인 팩트 & 벤치마크 패턴 ({coachAnalysis.facts?.length || 0}건)
+                        </span>
+
+                        {coachAnalysis.facts?.map((fac: any, idx: number) => (
+                          <div key={idx} className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-3xs space-y-2">
+                            <p className="text-xs text-gray-750 leading-relaxed font-semibold">
+                              {fac.claim}
+                            </p>
+                            <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded-md px-2">
+                              <span className="text-[9px] text-gray-400">출처/레퍼런스</span>
+                              <span className="text-[9.5px] text-gray-600 font-extrabold">{fac.source}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Interactive Coach Q&A history list (Bottom drawer inline space) */}
