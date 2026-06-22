@@ -277,8 +277,19 @@ const INITIAL_CHATS: ChatMessage[] = [
 // ==========================================
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'PRD' | '기능명세서' | '유저플로우'>('PRD');
+  const [activeTab, setActiveTab] = useState<'PRD' | '기능명세서' | '유저플로우' | '와이어프레임 BETA'>('PRD');
   
+  // Custom Toast Notification State to completely replace system native alerts
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'info' | 'warning' }[]>([]);
+  
+  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
+    const id = `toast-${Date.now()}`;
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
   // Left Sidebar Chat States
   const [chats, setChats] = useState<ChatMessage[]>(INITIAL_CHATS);
   const [typingInput, setTypingInput] = useState<string>('');
@@ -357,6 +368,9 @@ export default function App() {
     { id: 'flow-1', title: '새 플로우 1', date: '2026.06.22' }
   ]);
   const [selectedFlowNode, setSelectedFlowNode] = useState<string>('node-2');
+  
+  // Wireframe Selected Screen State
+  const [selectedWireframeId, setSelectedWireframeId] = useState<string>('screen-1');
 
   const activeNodeDetails = useMemo(() => {
     const nodesMap: { [key: string]: { title: string; goal: string; desc: string; trigger: string } } = {
@@ -454,7 +468,7 @@ export default function App() {
       }
       
       if (!currentFeat) {
-        alert("적용할 활성 기능 명세를 선택해 주세요.");
+        showToast("적용할 활성 기능 명세를 선택해 주세요.", "warning");
         return;
       }
       
@@ -476,7 +490,7 @@ export default function App() {
           })
         };
       }));
-      alert(`🎉수용 기준(AC)에 제안서가 반영되었습니다:\n"${acText}"`);
+      showToast(`수용 기준(AC)에 제안서가 반영되었습니다: "${acText.substring(0, 40)}..."`, "success");
     } else if (rec.target === "PRD") {
       let updatedPrd = { ...prdDoc };
       
@@ -489,11 +503,11 @@ export default function App() {
       }
       
       setPrdDoc(updatedPrd);
-      alert(`🎉PRD 기획 문서 타겟/정의 항목에 코치 피드백이 적용되었습니다!`);
+      showToast(`PRD 기획 문서 항목에 코치 피드백이 완벽하게 적용되었습니다!`, "success");
     } else if (rec.target === "FlowNode") {
-      alert(`🎉유저 플로우 현재 노드의 'AI 수치 이탈 가드라인'에 대체 예외 조치가 주입 완료되었습니다!`);
+      showToast(`유저 플로우 현재 노드의 'AI 수치 이탈 가드라인'에 대체 예외 조치가 주입 완료되었습니다!`, "success");
     } else {
-      alert(`🎉제품 출시 및 마케팅 극복 전략으로 벤치마크 기동방안이 설정되었습니다!`);
+      showToast(`제품 출시 및 마케팅 극복 전략으로 벤치마크 기동방안이 설정되었습니다!`, "info");
     }
   };
 
@@ -828,9 +842,9 @@ export default function App() {
           
           <div className="h-4 w-px bg-gray-200"></div>
 
-          {/* Centralized Primary Tab Nav */}
+           {/* Centralized Primary Tab Nav */}
           <nav className="flex space-x-1 bg-gray-100 p-0.5 rounded-lg">
-            {(['PRD', '기능명세서', '유저플로우'] as const).map((tab) => (
+            {(['PRD', '기능명세서', '유저플로우', '와이어프레임 BETA'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -838,18 +852,13 @@ export default function App() {
                   // Auto open coach for active sections to help guide users
                   if (coachPinned) setCoachOpen(true);
                 }}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-150 ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 ${
                   activeTab === tab 
-                    ? 'bg-white text-gray-900 shadow-xs' 
-                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50/50'
+                    ? 'bg-white text-gray-905 shadow-xs font-black ring-1 ring-black/5' 
+                    : 'text-gray-500 hover:text-gray-805 hover:bg-gray-50/50'
                 }`}
               >
                 {tab}
-                {tab === '유저플로우' && (
-                  <span className="ml-1 text-[8px] bg-purple-100 text-purple-700 px-1 rounded font-black max-sm:hidden">
-                    BETA
-                  </span>
-                )}
               </button>
             ))}
           </nav>
@@ -1972,6 +1981,436 @@ export default function App() {
             </div>
           )}
 
+          {/* ======================================================== */}
+          {/* TAB 4: WIREFRAME BETA ("와이어프레임 BETA")                */}
+          {/* ======================================================== */}
+          {activeTab === '와이어프레임 BETA' && (
+            <div className="flex-1 overflow-hidden flex bg-white divide-y divide-gray-150">
+              
+              {/* Dotted drawing grid area with responsive mobile frames */}
+              <div className="flex-1 overflow-hidden flex flex-col relative select-none">
+                
+                {/* Secondary navigation filters for Wireframe screens selection */}
+                <div className="p-3 bg-white border-b border-gray-200 flex items-center justify-between z-10 shrink-0">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                      와이어프레임 피델리티 ➜ 모바일 스크린 목업 구조화
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-1.5 text-[10px] font-bold text-gray-500">
+                    <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md border border-purple-100">전체 스크린</span>
+                    <span className="px-2 py-0.5 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">온보딩</span>
+                    <span className="px-2 py-0.5 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">매칭 서비스</span>
+                  </div>
+                </div>
+
+                {/* Grid canvas showing multi-mobile screens connected with interactive arrows */}
+                <div className="flex-1 overflow-auto p-8 relative" style={{
+                  backgroundImage: 'radial-gradient(#CBD5E1 1.1px, transparent 1.1px)',
+                  backgroundSize: '16px 16px'
+                }}>
+                  
+                  {/* Outer wrapper to contain connected mobile screen nodes */}
+                  <div className="flex items-start space-x-8 pb-12 relative z-10 pt-4">
+                    
+                    {/* Screen 1: Onboarding Portal */}
+                    <div 
+                      onClick={() => setSelectedWireframeId('screen-1')}
+                      className={`w-56 shrink-0 bg-white rounded-[24px] border-4 p-3 shadow-md hover:shadow-xl transition-all cursor-pointer relative ${
+                        selectedWireframeId === 'screen-1' 
+                          ? 'border-purple-600 ring-4 ring-purple-100 scale-102 bg-purple-50/10' 
+                          : 'border-slate-800 hover:border-slate-600'
+                      }`}
+                    >
+                      {/* Top mobile speaker earphone */}
+                      <div className="w-16 h-3.5 bg-slate-800 rounded-full mx-auto mb-3 flex items-center justify-center">
+                        <div className="w-6 h-1 bg-gray-500 rounded-full"></div>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-xl p-3 h-72 flex flex-col justify-between border border-gray-200 text-left">
+                        <div>
+                          <div className="flex justify-between items-center text-[8.5px] font-bold text-purple-600 mb-2">
+                            <span>Manny Coffee</span>
+                            <span className="px-1 bg-purple-100 text-[7.5px] rounded">v1.2</span>
+                          </div>
+                          
+                          <h4 className="text-[11px] font-black leading-snug text-gray-900 mb-1">
+                            공동 관심사를 가치로 승화하는 실시간 소셜 커피챗
+                          </h4>
+                          <p className="text-[8.5px] text-gray-400 font-semibold mb-2 leading-relaxed">
+                            느슨하지만 건설적인 직장인/커리어 매칭 포털에 어서 오십시오!
+                          </p>
+
+                          {/* Dummy illustration box info */}
+                          <div className="bg-purple-100/50 border border-purple-200/50 rounded-lg p-2 flex flex-col items-center justify-center my-3 text-center">
+                            <Sparkles size={16} className="text-purple-600 animate-pulse mb-1" />
+                            <span className="text-[8px] text-purple-900 font-black">AI 기반 맞춤형 인자 매칭</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5 pb-1">
+                          <button className="w-full py-1.5 bg-purple-600 text-white text-[8.5px] font-black rounded-lg shadow-3xs hover:bg-purple-700 transition-all">
+                            ⚡ 카카오 1초 로그인
+                          </button>
+                          <button className="w-full py-1.5 bg-white border border-gray-250 text-gray-700 text-[8.5px] font-bold rounded-lg hover:bg-gray-50">
+                            이메일로 신규 등록
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-2 text-center">
+                        <span className="text-[10px] font-extrabold text-gray-500">1. 가입 온보딩 포털</span>
+                      </div>
+                    </div>
+
+                    {/* Flow bridge Arrow */}
+                    <div className="self-center text-gray-300 font-black text-lg select-none">➜</div>
+
+                    {/* Screen 2: Sign-Up Traditional form */}
+                    <div 
+                      onClick={() => setSelectedWireframeId('screen-2')}
+                      className={`w-56 shrink-0 bg-white rounded-[24px] border-4 p-3 shadow-md hover:shadow-xl transition-all cursor-pointer relative ${
+                        selectedWireframeId === 'screen-2' 
+                          ? 'border-purple-600 ring-4 ring-purple-100 scale-102 bg-purple-50/10' 
+                          : 'border-slate-800 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="w-16 h-3.5 bg-slate-800 rounded-full mx-auto mb-3 flex items-center justify-center">
+                        <div className="w-6 h-1 bg-gray-500 rounded-full"></div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-xl p-3 h-72 flex flex-col justify-between border border-gray-200 text-left">
+                        <div>
+                          <span className="text-[8.5px] font-black text-gray-400 block mb-1">회원가입 단계</span>
+                          <h4 className="text-[10.5px] font-black text-gray-900">계정 명세 기입</h4>
+                          
+                          <div className="space-y-2 mt-4">
+                            <div className="space-y-0.5">
+                              <label className="text-[7.5px] font-bold text-gray-400">사용 이메일 ID</label>
+                              <input 
+                                type="text" 
+                                placeholder="name@company.com" 
+                                className="w-full bg-white border border-gray-200 rounded p-1 text-[8.5px] outline-none"
+                                disabled 
+                              />
+                            </div>
+                            <div className="space-y-0.5">
+                              <label className="text-[7.5px] font-bold text-gray-400">비밀번호 기입</label>
+                              <input 
+                                type="password" 
+                                value="●●●●●●●●" 
+                                className="w-full bg-white border border-gray-200 rounded p-1 text-[8.5px] outline-none text-gray-400"
+                                disabled 
+                              />
+                            </div>
+                            <div className="space-y-0.5">
+                              <label className="text-[7.5px] font-bold text-gray-400">기본 소속 / 직무 필드</label>
+                              <input 
+                                type="text" 
+                                placeholder="예: IT 프로덕트 디자이너" 
+                                className="w-full bg-white border border-gray-200 rounded p-1 text-[8.5px] outline-none"
+                                disabled 
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <button className="w-full py-1.5 bg-purple-600 text-white text-[8.5px] font-black rounded-lg hover:bg-purple-700 transition-all">
+                          가입 승인 & 다음 진행 ➜
+                        </button>
+                      </div>
+
+                      <div className="mt-2 text-center">
+                        <span className="text-[10px] font-extrabold text-gray-500">2. 소셜/이메일 가입 폼</span>
+                      </div>
+                    </div>
+
+                    {/* Flow bridge Arrow */}
+                    <div className="self-center text-gray-300 font-black text-lg select-none">➜</div>
+
+                    {/* Screen 3: Bento Interest Selection */}
+                    <div 
+                      onClick={() => setSelectedWireframeId('screen-3')}
+                      className={`w-56 shrink-0 bg-white rounded-[24px] border-4 p-3 shadow-md hover:shadow-xl transition-all cursor-pointer relative ${
+                        selectedWireframeId === 'screen-3' 
+                          ? 'border-purple-600 ring-4 ring-purple-100 scale-102 bg-purple-50/10' 
+                          : 'border-slate-800 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="w-16 h-3.5 bg-slate-800 rounded-full mx-auto mb-3 flex items-center justify-center">
+                        <div className="w-6 h-1 bg-gray-500 rounded-full"></div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-xl p-3 h-72 flex flex-col justify-between border border-gray-200 text-left">
+                        <div>
+                          <span className="text-[8.5px] font-black text-gray-400 block mb-1">관심사 수집 온보딩</span>
+                          <h4 className="text-[10.5px] font-black text-gray-900 leading-tight">
+                            가장 관심 있는 키워드를 3개 이상 선택하세요
+                          </h4>
+
+                          <div className="grid grid-cols-2 gap-1.5 mt-4">
+                            {[
+                              { label: "IT 개발 💻", active: true },
+                              { label: "마케팅 📈", active: true },
+                              { label: "디자인 🎨", active: true },
+                              { label: "스타트업 🚀", active: false },
+                              { label: "기획/PM 💡", active: false },
+                              { label: "인맥네트 ☕", active: false }
+                            ].map((chip, idx) => (
+                              <div 
+                                key={idx}
+                                className={`p-1.5 rounded-lg border text-center text-[8px] font-bold transition-all ${
+                                  chip.active 
+                                    ? 'bg-purple-100 border-purple-300 text-purple-900 font-extrabold' 
+                                    : 'bg-white border-gray-200 text-gray-505 hover:bg-white'
+                                }`}
+                              >
+                                {chip.label}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="text-center">
+                          <p className="text-[8px] text-[#7C3AED] font-black mb-1.5">3개 선택 완료됨!</p>
+                          <button className="w-full py-1.5 bg-purple-600 text-white text-[8.5px] font-black rounded-lg hover:bg-purple-700 transition-all">
+                            알고리즘 추천 결과 받기 ➜
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 text-center">
+                        <span className="text-[10px] font-extrabold text-gray-500">3. 관심 키워드 넛징</span>
+                      </div>
+                    </div>
+
+                    {/* Flow bridge Arrow */}
+                    <div className="self-center text-gray-300 font-black text-lg select-none">➜</div>
+
+                    {/* Screen 4: recommendation main list */}
+                    <div 
+                      onClick={() => setSelectedWireframeId('screen-4')}
+                      className={`w-56 shrink-0 bg-white rounded-[24px] border-4 p-3 shadow-md hover:shadow-xl transition-all cursor-pointer relative ${
+                        selectedWireframeId === 'screen-4' 
+                          ? 'border-purple-600 ring-4 ring-purple-100 scale-102 bg-purple-50/10' 
+                          : 'border-slate-800 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="w-16 h-3.5 bg-slate-800 rounded-full mx-auto mb-3 flex items-center justify-center">
+                        <div className="w-6 h-1 bg-gray-500 rounded-full"></div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-xl p-3 h-72 flex flex-col justify-between border border-gray-200 text-left">
+                        <div>
+                          <div className="flex justify-between items-center mb-1 bg-transparent">
+                            <span className="text-[8.5px] font-black text-purple-700">오늘의 마인드 추천</span>
+                            <span className="text-[7.5px] text-gray-400 font-bold">오전 12:00 갱신</span>
+                          </div>
+                          
+                          <div className="bg-white rounded-lg border border-gray-150 p-2 space-y-1.5 mt-2.5">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-5 h-5 rounded-full bg-indigo-500 text-[8px] text-white flex items-center justify-center font-black">
+                                PM
+                              </div>
+                              <div>
+                                <h5 className="text-[9px] font-black text-gray-900 leading-none">맥스 기획자</h5>
+                                <span className="text-[7.5px] text-gray-400 font-bold">카카오 실무 6년차</span>
+                              </div>
+                            </div>
+                            
+                            <p className="text-[8px] text-gray-600 leading-relaxed font-semibold">
+                              "시너지 넘치는 커피챗을 통해 비즈니스 모델 설계 고민을 해결해 드립니다."
+                            </p>
+                            
+                            <div className="flex flex-wrap gap-1">
+                              <span className="text-[6.5px] bg-gray-100 px-1 py-0.2 rounded text-gray-500">#스타트업BM</span>
+                              <span className="text-[6.5px] bg-gray-100 px-1 py-0.2 rounded text-gray-500">#서비스가치</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg border border-gray-150 p-2 opacity-50 space-y-1.5 mt-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-5 h-5 rounded-full bg-emerald-500 text-[8px] text-white flex items-center justify-center font-black">
+                                Dev
+                              </div>
+                              <div>
+                                <h5 className="text-[9px] font-black text-gray-900">제이콥 디벨로퍼</h5>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button className="w-full py-1.5 bg-purple-600 text-white text-[8.5px] font-black rounded-lg hover:bg-purple-700 transition-all">
+                          ☕ 이 유저와 커피챗 성사 매칭 신청
+                        </button>
+                      </div>
+
+                      <div className="mt-2 text-center">
+                        <span className="text-[10px] font-extrabold text-gray-500">4. 알고리즘 추천 마인드</span>
+                      </div>
+                    </div>
+
+                    {/* Flow bridge Arrow */}
+                    <div className="self-center text-gray-300 font-black text-lg select-none">➜</div>
+
+                    {/* Screen 5: scheduling calendar details */}
+                    <div 
+                      onClick={() => setSelectedWireframeId('screen-5')}
+                      className={`w-56 shrink-0 bg-white rounded-[24px] border-4 p-3 shadow-md hover:shadow-xl transition-all cursor-pointer relative ${
+                        selectedWireframeId === 'screen-5' 
+                          ? 'border-purple-600 ring-4 ring-purple-100 scale-102 bg-purple-50/10' 
+                          : 'border-slate-800 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="w-16 h-3.5 bg-slate-800 rounded-full mx-auto mb-3 flex items-center justify-center">
+                        <div className="w-6 h-1 bg-gray-500 rounded-full"></div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-xl p-3 h-72 flex flex-col justify-between border border-gray-200 text-left">
+                        <div>
+                          <span className="text-[8.5px] font-black text-gray-400 block mb-1">스케줄 확정 단계</span>
+                          <h4 className="text-[10.5px] font-black text-gray-900">커피챗 성합 일정 슬롯 조율</h4>
+                          
+                          <div className="bg-white rounded-lg border border-gray-150 p-2 mt-3 space-y-2">
+                            <span className="text-[7.5px] text-gray-400 font-semibold block uppercase">6월 최적 추천 요일</span>
+                            <div className="grid grid-cols-5 gap-1 text-[7.5px] text-center font-bold">
+                              <span className="p-1 bg-gray-100 rounded text-gray-400">22 월</span>
+                              <span className="p-1 bg-purple-100 text-purple-700 rounded ring-1 ring-purple-200">23 화</span>
+                              <span className="p-1 bg-purple-100 text-purple-700 rounded ring-1 ring-purple-200">24 수</span>
+                              <span className="p-1 bg-gray-100 rounded text-gray-400">25 목</span>
+                              <span className="p-1 bg-gray-100 rounded text-gray-400">26 금</span>
+                            </div>
+                            
+                            <div className="space-y-1 pt-1 border-t border-gray-100 text-[8px]">
+                              <div className="flex justify-between text-gray-700">
+                                <span>선택된 요일</span>
+                                <span className="font-extrabold text-purple-600">6월 23일 (화)</span>
+                              </div>
+                              <div className="flex justify-between text-gray-700">
+                                <span>가능 공통 시간</span>
+                                <span className="font-extrabold text-purple-600">저녁 19:30</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button className="w-full py-1.5 bg-purple-600 text-white text-[8.5px] font-black rounded-lg hover:bg-purple-700 transition-all">
+                          📅 약속 확정 알림 카톡 발송하기
+                        </button>
+                      </div>
+
+                      <div className="mt-2 text-center">
+                        <span className="text-[10px] font-extrabold text-gray-500">5. 커피챗 예약 최종조율</span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* Right Side Administration panel for Wireframes diagnostic feedback */}
+              <div className="w-[300px] border-l border-gray-200 bg-[#FCFCFD] flex flex-col shrink-0 max-sm:hidden">
+                <div className="p-4 border-b border-gray-199 bg-white">
+                  <span className="font-extrabold text-[10px] text-purple-600 block uppercase tracking-widest mb-1">
+                    와이어프레임 설계 조력
+                  </span>
+                  <h3 className="font-extrabold text-xs text-gray-900">
+                    모바일 화면 기획 보고서
+                  </h3>
+                  
+                  <button className="mt-3 w-full flex items-center justify-center space-x-1.5 bg-purple-50 border border-purple-200 text-[#7C3AED] hover:bg-purple-100 text-xs font-black py-2 rounded-lg shadow-3xs transition-all">
+                    <Sparkles size={11} className="text-yellow-400 animate-spin" />
+                    <span>+ 신규 와이어프레임 생성</span>
+                  </button>
+                </div>
+
+                <div className="p-4 border-b border-gray-100 space-y-2">
+                  <span className="text-[10px] text-gray-400 font-bold block uppercase">화면 정보 제어</span>
+                  <div className="p-3 bg-white border border-gray-250 rounded-xl shadow-3xs relative">
+                    <div className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 cursor-pointer">
+                      <MoreVertical size={13} />
+                    </div>
+                    <span className="text-[11px] font-black text-gray-900 block">인맥 네트워킹 와플버전 1</span>
+                    <span className="text-[9px] text-gray-400 block mt-0.5">최종 수정 상태: 2026.06.22</span>
+                    <button className="mt-3.5 w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-bold py-2 rounded-lg text-gray-600 text-center">
+                      ✏️ 수정본 만들기
+                    </button>
+                  </div>
+                </div>
+
+                {/* Diagnostic details section with conditional bindings */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/40">
+                  <div>
+                    <span className="text-[10px] text-purple-600 font-bold block uppercase tracking-wide">
+                      선택 화면 디테일 명세
+                    </span>
+                    <h4 className="text-xs font-black text-gray-950 mt-0.5 leading-snug">
+                      {selectedWireframeId === 'screen-1' ? '1. 가입 온보딩 포털' :
+                       selectedWireframeId === 'screen-2' ? '2. 소셜/이메일 가입 폼' :
+                       selectedWireframeId === 'screen-3' ? '3. 관심 키워드 넛징 스크린' :
+                       selectedWireframeId === 'screen-4' ? '4. 오늘의 알고리즘 추천 마인드' :
+                       '5. 커피챗 최종 조율 슬롯 예약 캘린더'}
+                    </h4>
+                  </div>
+
+                  <div className="space-y-4 text-xs leading-relaxed font-semibold">
+                    <div>
+                      <span className="text-gray-400 block text-[9px] uppercase mb-0.5">설계 철학 및 요약</span>
+                      <p className="bg-white p-2.5 rounded-lg border border-gray-200 text-gray-700 shadow-3xs">
+                        {selectedWireframeId === 'screen-1' ? '소셜 1클릭 가입 및 마케팅 혜택과 서비스 안내가 한눈에 나타납니다. UI 일관성을 위해 "매치 성사 가치 제안"을 첫화면에 핵심으로 부각합니다.' :
+                         selectedWireframeId === 'screen-2' ? '최소 정보만 입력하는 이중 패스워드 검증 구조입니다. 복잡한 가입 정보를 다 기입하기 전, 이메일로 간단히 인증 세선을 확보합니다.' :
+                         selectedWireframeId === 'screen-3' ? '사용자의 관심 태그를 3개 이상 필수로 수집하는 화면입니다. 그리드로 구성된 각 키워드 칩들은 원클릭으로 손쉽게 하이라이트됩니다.' :
+                         selectedWireframeId === 'screen-4' ? '매일 자정에 갱신되는 유사 최적 인맥 추천 목록을 카드식 UI로 둘러봅니다. 마인드 가치 매니패스트 기반 커피챗 신청이 원터치로 진행됩니다.' :
+                         '앱 내 마이 캘린더에서 양자 간 스케줄링 여력 슬롯이 자동 중첩 캘린더 피드로 추천 표시됩니다.'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-400 block text-[9px] uppercase mb-0.5">구현 목표 수치</span>
+                      <p className="bg-white p-2.5 rounded-lg border border-gray-200 text-gray-700 shadow-3xs">
+                        {selectedWireframeId === 'screen-1' ? '신규 가입 유입 경로에서 마찰 및 중도 이탈률 1.2% 이내 방어' :
+                         selectedWireframeId === 'screen-2' ? '가입 폼 오기입 및 양식 포맷 불일치로 인한 중도 포기방지 98%' :
+                         selectedWireframeId === 'screen-3' ? '가중치 성실 기입률 90% 이상 유지' :
+                         selectedWireframeId === 'screen-4' ? '커피챗 최초 신청 전이 행동 전환율 45% 확보' :
+                         '캘린더 충돌 이탈 계수 완전 제로로 회귀화'}
+                      </p>
+                    </div>
+
+                    <div className="bg-red-50/50 p-2.5 border border-red-100 rounded-lg text-red-950">
+                      <span className="text-red-600 block text-[9px] uppercase font-black mb-1 flex items-center">
+                        <AlertCircle size={10} className="mr-1 animate-pulse" />
+                        AI 수치 이탈 가드라인 (위험 대우)
+                      </span>
+                      <p className="text-[11px] leading-relaxed">
+                        {selectedWireframeId === 'screen-1' ? '이메일 가입 번거로움에 봉착 시, 패스워드 프리 1회 임시 매니패스트 통과 가입 포딩 처리 기능 마련.' :
+                         selectedWireframeId === 'screen-2' ? '패스워드 입력 오기입 시 실시간 유효 조언 필드(UI 경고창)를 즉시 보정하여 이탈 극복.' :
+                         selectedWireframeId === 'screen-3' ? '칩 개수 허가 단계를 유동적으로 해제하고 가입 후 "마이 페이지" 피드백으로 미루는 허들 제거.' :
+                         selectedWireframeId === 'screen-4' ? '추천 인력이 없을 시 가상의 콜드 스타트용 시너지 인재 가이드를 연동해 빈 화면 노출 억제.' :
+                         '선호 일정 불일치 충돌 시, 카카오 알림톡으로 수동 약속 조율을 대리할 임시 대기 슬롯 링크 발행.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      setCoachOpen(true);
+                      setCoachAnswers(prev => [...prev, `나: ${selectedWireframeId}번 화면의 UI 결함을 극복하기 위한 수용 분석 제안 부탁해.`]);
+                    }}
+                    className="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold text-xs rounded-lg shadow-sm hover:shadow flex items-center justify-center space-x-1 cursor-pointer"
+                  >
+                    <Sparkles size={11} />
+                    <span>이 화면 코치 분석 요청</span>
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
         </main>
 
         {/* ------------------------------------------------------------- */}
@@ -2286,6 +2725,34 @@ export default function App() {
           />
         )}
 
+      </div>
+
+      {/* Floating Toast Alert Notifications Stack with High Visual Fidelity */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col space-y-2.5 max-w-sm pointer-events-none">
+        {toasts.map((toast) => (
+          <div 
+            key={toast.id} 
+            className={`p-4 rounded-xl shadow-xl border text-xs font-black flex items-center justify-between space-x-4 pointer-events-auto transition-all duration-350 bg-white/95 backdrop-blur-md ${
+              toast.type === 'success' ? 'text-emerald-950 border-emerald-200 bg-emerald-50/95 shadow-emerald-500/5' :
+              toast.type === 'warning' ? 'text-amber-950 border-amber-200 bg-amber-50/95 shadow-amber-500/5' :
+              'text-indigo-950 border-indigo-200 bg-indigo-50/95 shadow-indigo-505/5'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <span className="text-sm shrink-0">
+                {toast.type === 'success' ? '🎉' : toast.type === 'warning' ? '⚠️' : 'ℹ️'}
+              </span>
+              <span className="leading-tight">{toast.message}</span>
+            </div>
+            <button 
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="text-[11px] text-gray-400 hover:text-gray-900 font-bold focus:outline-none transition-colors shrink-0"
+              title="닫기"
+            >
+              ×
+            </button>
+          </div>
+        ))}
       </div>
 
     </div>
