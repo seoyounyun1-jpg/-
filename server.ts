@@ -66,11 +66,13 @@ CONTEXT:
 - User's Message/Question:
   "${userMessage || "전체 상태 검증 및 비판적 리스크 분석을 시작합니다."}"
 
-Analyze the context deeply based on your behavioral instructions. Fill in factual points, assumptions, actionable and direct recommendations, and uncomfortable challenges. Output MUST strictly match the response schema.
+Analyze the context deeply based on your behavioral instructions. Fill in factual points, assumptions, actionable and direct recommendations, and uncomfortable challenges. 
+CRITICAL: You MUST generate at least 5 challenges for the 'challenges' array.
+Output MUST strictly match the response schema.
 `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.0-flash",
       contents: promptText,
       config: {
         systemInstruction: systemInstruction,
@@ -169,7 +171,7 @@ If they ask about "Manny Coach", refer to the right sidebar decision-coach.
 `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.0-flash",
       contents: [
         ...chatHistory,
         { role: "user", parts: [{ text: message }] }

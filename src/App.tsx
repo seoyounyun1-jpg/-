@@ -279,6 +279,21 @@ const INITIAL_CHATS: ChatMessage[] = [
 export default function App() {
   const [activeTab, setActiveTab] = useState<'PRD' | '기능명세서' | '유저플로우' | '와이어프레임 BETA'>('PRD');
   
+  const [promptModal, setPromptModal] = useState<{isOpen: boolean, title: string, onSubmit: (val: string) => void}>({isOpen: false, title: '', onSubmit: () => {}});
+
+  const handlePrdChange = (section: string, field: string, value: string) => {
+    setPrdDoc(prev => ({
+      ...prev,
+      sections: {
+        ...prev.sections,
+        [section as keyof typeof prev.sections]: {
+          ...prev.sections[section as keyof typeof prev.sections],
+          [field]: value
+        }
+      }
+    }));
+  };
+
   // Custom Toast Notification State to completely replace system native alerts
   const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'info' | 'warning' }[]>([]);
   
@@ -356,7 +371,11 @@ export default function App() {
       {
         question: "사용자들이 이 서비스에 대해 1회 커피챗당 실제 가치(WTP)를 단 1,000원이라도 지불할 행동 유인이 있는가? 무료 매칭만 소모 후 종료될 위험은 없나?",
         category: "WTP"
-      }
+      },
+      { question: "현재 타겟인 '모든 직장인'은 너무 넓다. 초기 핵심 지지층 100명을 모을 구체적 틈새 시장(Niche)은 어디인가?", category: "TAM" },
+      { question: "링크드인이나 기존 오픈채팅방과 비교했을 때, 사용자가 굳이 이 앱을 깔아야 할 압도적인 차별화 포인트가 있는가?", category: "Competitor" },
+      { question: "사용자가 관심사를 등록한다고 해서, 실제로 오프라인/온라인 만남까지 이어질 것이라는 가정은 어떻게 검증할 것인가?", category: "Assumption" },
+      { question: "수익 모델이 광고나 프리미엄 매칭이라면, 그를 지탱할 만큼의 MAU 성장을 위해 CAC(고객 획득 비용)를 어떻게 감당할 것인가?", category: "WTP" }
     ],
     coachSummary: "현재 설계된 관심사 대칭 및 매칭 프로세스는 깔끔하나, 캘린더 마찰 시 예외 대안(AC)이 비어있어 이탈 가능성이 막대합니다. 디시전 코치가 제시한 리스크 기반 검토 항목을 확인하고, 우측 추천 상자를 클릭해 기획 문서에 일괄 자동 적용하십시오."
   });
@@ -435,11 +454,16 @@ export default function App() {
         userMessage: customMessage || ""
       };
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+
       const response = await fetch("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) throw new Error("API call failed");
 
@@ -452,6 +476,22 @@ export default function App() {
       }
     } catch (e) {
       console.error("Manny Coach API failed, using fallback mock data:", e);
+      setCoachAnalysis({
+        facts: [
+          { claim: `[${activeTab}] 환경 분석 실패 (API 서버 응답 지연/오류).`, source: "시스템 폴백" }
+        ],
+        assumptions: [
+          { assumption: "초기 설정 오류 또는 API 키 누락으로 인해 실제 분석 데이터를 가져오지 못하고 있습니다.", risk: "High", validationSuggestion: ".env 설정 또는 터미널 서버 로그를 확인하세요." }
+        ],
+        recommendations: [
+          { action: "Add AC: 'AI 추천 서버 장애 시 사용자에게 명확한 에러 안내 모달을 노출해야 한다.'", target: "AC", rationale: "의존성 장애에 대비한 안정성 가이드라인입니다.", confidence: "Heuristic" }
+        ],
+        challenges: [
+          { question: "현재 서비스 환경 설정이 불완전합니다. 실제 서비스 운영 시에도 이런 식의 빈번한 외부 장애를 겪는다면 유저 이탈을 어떻게 방어할 것인가요?", category: "Assumption" },
+          { question: "API가 계속 동작하지 않는다면, 이 앱의 핵심 가치(Value Proposition)는 완전히 소멸하는가?", category: "WTP" }
+        ],
+        coachSummary: `현재 [${activeTab}] 화면에 대한 API 분석 시도 중 타임아웃/오류가 발생했습니다. 로컬 환경의 GEMINI_API_KEY 또는 서버 구동 상태(npm run dev)를 점검하세요.`
+      });
     } finally {
       setCoachLoading(false);
     }
@@ -678,70 +718,84 @@ export default function App() {
   };
 
   const handleAddNewAc = (featId: string) => {
-    const text = prompt("새로운 수용 기준(Acceptance Criteria)을 입력하세요:");
-    if (!text || !text.trim()) return;
-
-    setRequirements(prev => prev.map(req => {
-      return {
-        ...req,
-        features: req.features.map(feat => {
-          if (feat.id === featId) {
-            const currentAc = feat.ac || [];
-            return {
-              ...feat,
-              ac: [...currentAc, { id: `ac-custom-${Date.now()}`, text: text.trim(), checked: false }]
-            };
-          }
-          return feat;
-        })
-      };
-    }));
+    setPromptModal({
+      isOpen: true,
+      title: "새로운 수용 기준(Acceptance Criteria)을 입력하세요:",
+      onSubmit: (text) => {
+        if (!text || !text.trim()) return;
+        setRequirements(prev => prev.map(req => {
+          return {
+            ...req,
+            features: req.features.map(feat => {
+              if (feat.id === featId) {
+                const currentAc = feat.ac || [];
+                return {
+                  ...feat,
+                  ac: [...currentAc, { id: `ac-custom-${Date.now()}`, text: text.trim(), checked: false }]
+                };
+              }
+              return feat;
+            })
+          };
+        }));
+      }
+    });
   };
 
   const handleAddNewFeature = (reqId: string) => {
-    const title = prompt("새로운 상세 기능명을 입력하세요:");
-    if (!title || !title.trim()) return;
+    setPromptModal({
+      isOpen: true,
+      title: "새로운 상세 기능명을 입력하세요:",
+      onSubmit: (title) => {
+        if (!title || !title.trim()) return;
 
-    const newFeature: Feature = {
-      id: `feat-custom-${Date.now()}`,
-      title: title.trim(),
-      idCode: `R-CUST-${Math.floor(1000 + Math.random() * 9000)}`,
-      status: '대기중',
-      priority: 'Medium',
-      assignee: 'Unassigned',
-      desc: '새롭게 인입된 수동 기획 기능 명세 구조입니다. 상세 요구사항에 맞춤 설정을 등록해 보세요.',
-      ac: [
-        { id: `ac-init-${Date.now()}`, text: `${title.trim()}에 적합한 기본 성능 수용 기준을 충족해야 한다.`, checked: false }
-      ]
-    };
-
-    setRequirements(prev => prev.map(req => {
-      if (req.id === reqId) {
-        return {
-          ...req,
-          features: [...req.features, newFeature]
+        const newFeature: Feature = {
+          id: `feat-custom-${Date.now()}`,
+          title: title.trim(),
+          idCode: `R-CUST-${Math.floor(1000 + Math.random() * 9000)}`,
+          status: '대기중',
+          priority: 'Medium',
+          assignee: 'Unassigned',
+          desc: '새롭게 인입된 수동 기획 기능 명세 구조입니다. 상세 요구사항에 맞춤 설정을 등록해 보세요.',
+          ac: [
+            { id: `ac-init-${Date.now()}`, text: `${title.trim()}에 적합한 기본 성능 수용 기준을 충족해야 한다.`, checked: false }
+          ]
         };
-      }
-      return req;
-    }));
 
-    setSelectedFeatId(newFeature.id);
+        setRequirements(prev => prev.map(req => {
+          if (req.id === reqId) {
+            return {
+              ...req,
+              features: [...req.features, newFeature]
+            };
+          }
+          return req;
+        }));
+
+        setSelectedFeatId(newFeature.id);
+      }
+    });
   };
 
   const handleAddNewRequirement = () => {
-    const title = prompt("새로운 요구사항 대분류명을 입력하세요:");
-    if (!title || !title.trim()) return;
+    setPromptModal({
+      isOpen: true,
+      title: "새로운 요구사항 대분류명을 입력하세요:",
+      onSubmit: (title) => {
+        if (!title || !title.trim()) return;
 
-    const newReq: Requirement = {
-      id: `req-custom-${Date.now()}`,
-      number: requirements.length + 1,
-      title: title.trim(),
-      isStarred: true,
-      features: []
-    };
+        const newReq: Requirement = {
+          id: `req-custom-${Date.now()}`,
+          number: requirements.length + 1,
+          title: title.trim(),
+          isStarred: true,
+          features: []
+        };
 
-    setRequirements(prev => [...prev, newReq]);
-    setSelectedReqId(newReq.id);
+        setRequirements(prev => [...prev, newReq]);
+        setSelectedReqId(newReq.id);
+      }
+    });
   };
 
   // Filtered requirements list based on searching
@@ -913,7 +967,7 @@ export default function App() {
               <span className="font-extrabold text-xs text-gray-800 tracking-tight">Manny AI Assistant</span>
             </div>
             <span className="text-[9px] text-[#A78BFA] font-bold uppercase bg-purple-50 border border-purple-100/60 px-1.5 py-0.5 rounded-md">
-              gpt-4o
+              Gemini 3.5 Flash
             </span>
           </div>
 
@@ -996,7 +1050,7 @@ export default function App() {
                     <Paperclip size={14} />
                   </button>
                   <div className="bg-white border border-gray-250 shadow-2xs rounded-lg px-2 py-0.5 text-[10px] font-bold text-gray-500 flex items-center space-x-1 cursor-pointer">
-                    <span>gpt-4o</span>
+                    <span>Gemini</span>
                     <ChevronDown size={10} />
                   </div>
                   <span className="text-[10px] text-gray-400 font-bold bg-gray-200/50 px-1.5 py-0.5 rounded-sm">
@@ -1086,21 +1140,30 @@ export default function App() {
                     <div className="space-y-4 text-xs leading-relaxed">
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">한 줄 정의</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.overview.oneLiner}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.overview.oneLiner}
+                          onChange={(e) => handlePrdChange('overview', 'oneLiner', e.target.value)}
+                          rows={2}
+                        />
                       </div>
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">제품 목표</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.overview.goal}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.overview.goal}
+                          onChange={(e) => handlePrdChange('overview', 'goal', e.target.value)}
+                          rows={3}
+                        />
                       </div>
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">배경</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.overview.background}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.overview.background}
+                          onChange={(e) => handlePrdChange('overview', 'background', e.target.value)}
+                          rows={4}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1117,21 +1180,30 @@ export default function App() {
                     <div className="space-y-4 text-xs leading-relaxed">
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">사용자 문제</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.problem.search}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.problem.search}
+                          onChange={(e) => handlePrdChange('problem', 'search', e.target.value)}
+                          rows={3}
+                        />
                       </div>
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">해결 방안</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.problem.solution}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.problem.solution}
+                          onChange={(e) => handlePrdChange('problem', 'solution', e.target.value)}
+                          rows={5}
+                        />
                       </div>
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">차별성</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.problem.differentiation}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.problem.differentiation}
+                          onChange={(e) => handlePrdChange('problem', 'differentiation', e.target.value)}
+                          rows={4}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1148,15 +1220,21 @@ export default function App() {
                     <div className="space-y-4 text-xs leading-relaxed">
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">타겟 사용자</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.target.targetUser}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.target.targetUser}
+                          onChange={(e) => handlePrdChange('target', 'targetUser', e.target.value)}
+                          rows={3}
+                        />
                       </div>
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">사용자 시나리오</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium leading-relaxed">
-                          {prdDoc.sections.target.scenario}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium leading-relaxed resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.target.scenario}
+                          onChange={(e) => handlePrdChange('target', 'scenario', e.target.value)}
+                          rows={4}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1173,15 +1251,21 @@ export default function App() {
                     <div className="space-y-4 text-xs leading-relaxed">
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">핵심 지표</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.success.metrics}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.success.metrics}
+                          onChange={(e) => handlePrdChange('success', 'metrics', e.target.value)}
+                          rows={3}
+                        />
                       </div>
                       <div>
                         <h3 className="font-extrabold text-gray-400 mb-1">리스크</h3>
-                        <p className="bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium">
-                          {prdDoc.sections.success.risks}
-                        </p>
+                        <textarea 
+                          className="w-full bg-gray-50/70 p-3.5 rounded-xl text-gray-700 border border-gray-100/50 font-medium resize-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all outline-none"
+                          value={prdDoc.sections.success.risks}
+                          onChange={(e) => handlePrdChange('success', 'risks', e.target.value)}
+                          rows={3}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1726,7 +1810,7 @@ export default function App() {
                             {requirements.find(r => r.id === selectedMindmapNode)?.title}
                           </h4>
                           <p className="text-xs text-gray-500 leading-relaxed">
-                            매칭 알고리즘과 수용 가치 매니패스트는 가입 온보딩과 실시간 피드백을 동기화하여 성사율을 견인하는 핵심 브릿지 요소입니다.
+                            {requirements.find(r => r.id === selectedMindmapNode)?.features.map(f => f.desc).filter(Boolean).join(" ") || "하위 기능들의 상세 내용을 통해 수용 기준을 구체화하는 영역입니다."}
                           </p>
 
                           <div className="bg-gray-50 p-3 rounded-xl border border-gray-100/50 space-y-2">
@@ -1889,13 +1973,24 @@ export default function App() {
                     </div>
 
                     {/* Lane C: "커피챗 일정 조율 스케줄러" */}
-                    <div className="border border-gray-200/40 bg-[#FCFCFD]/20 border-dashed rounded-2xl p-4 min-h-[120px] relative flex items-center justify-center">
-                      <div className="absolute top-3 left-3 bg-gray-100 text-gray-400 px-2 py-0.5 rounded text-[9px] font-black uppercase">
+                    <div className="border border-purple-100/50 bg-[#FCFCFD]/70 rounded-2xl p-4 min-h-[140px] relative">
+                      <div className="absolute top-3 left-3 bg-purple-100/50 text-purple-700 px-2 py-0.5 rounded text-[9px] font-black uppercase">
                         커피챗 일정 약속 조율 캘린더 구간
                       </div>
-                      <span className="text-xs text-gray-400 font-extrabold">
-                        ※ 온보딩 기획 완료 후 세부 캘린더 스케줄링 노드 추가 생성 지원 예정
-                      </span>
+
+                      <div className="flex items-center space-x-12 pt-8 pl-4">
+                        <div className="w-28 py-3 rounded-xl border border-gray-300 bg-white text-center shadow-3xs cursor-pointer hover:border-purple-300 transition-all">
+                          <span className="text-xs font-black text-gray-700">캘린더 슬롯 선택</span>
+                        </div>
+                        <div className="text-gray-300">➜</div>
+                        <div className="w-32 py-3 rounded-xl border border-gray-300 bg-white text-center shadow-3xs cursor-pointer hover:border-purple-300 transition-all">
+                          <span className="text-xs font-black text-gray-700">상대방에게 제안</span>
+                        </div>
+                        <div className="text-gray-300">➜</div>
+                        <div className="w-28 py-3 rounded-xl border border-purple-300 bg-purple-50 text-center shadow-sm cursor-pointer hover:bg-purple-100 transition-all">
+                          <span className="text-xs font-black text-purple-700">예약 최종 확정</span>
+                        </div>
+                      </div>
                     </div>
 
                   </div>
@@ -2726,6 +2821,50 @@ export default function App() {
         )}
 
       </div>
+
+      {/* Prompt Modal */}
+      {promptModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-80 overflow-hidden transform transition-all">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-black text-gray-900">{promptModal.title}</h3>
+            </div>
+            <div className="p-5">
+              <input
+                type="text"
+                autoFocus
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-purple-500/50 focus:bg-white transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    promptModal.onSubmit((e.target as HTMLInputElement).value);
+                    setPromptModal({ isOpen: false, title: '', onSubmit: () => {} });
+                  }
+                }}
+              />
+            </div>
+            <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end space-x-2">
+              <button
+                onClick={() => setPromptModal({ isOpen: false, title: '', onSubmit: () => {} })}
+                className="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-200 rounded-lg transition-all"
+              >
+                취소
+              </button>
+              <button
+                onClick={(e) => {
+                  const input = e.currentTarget.parentElement?.previousElementSibling?.querySelector('input');
+                  if (input) {
+                    promptModal.onSubmit(input.value);
+                    setPromptModal({ isOpen: false, title: '', onSubmit: () => {} });
+                  }
+                }}
+                className="px-4 py-2 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm transition-all"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Toast Alert Notifications Stack with High Visual Fidelity */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col space-y-2.5 max-w-sm pointer-events-none">
