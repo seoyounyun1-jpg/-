@@ -328,6 +328,8 @@ export default function App() {
   // Context Guide panel states
   const [coachOpen, setCoachOpen] = useState<boolean>(false);
   const [coachPinned, setCoachPinned] = useState<boolean>(false);
+  const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState<boolean>(false);
 
   // ① 시장 데이터 카드
   const [marketDataOpen, setMarketDataOpen] = useState<boolean>(true);
@@ -977,7 +979,10 @@ export default function App() {
             </button>
           </div>
 
-          <button className="flex items-center space-x-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-all">
+          <button
+            onClick={() => { setShareModalOpen(true); setShareLinkCopied(false); }}
+            className="flex items-center space-x-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-all"
+          >
             <Share size={12} />
             <span>공유</span>
           </button>
@@ -1002,7 +1007,10 @@ export default function App() {
           <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white">
             <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-xs"></div>
-              <span className="font-extrabold text-xs text-gray-800 tracking-tight">Manny AI Assistant</span>
+              <div>
+                <span className="font-extrabold text-xs text-gray-800 tracking-tight block leading-none">Manny AI Assistant</span>
+                <span className="text-[9px] text-gray-400 font-medium mt-0.5 block">기획서를 함께 만들어요</span>
+              </div>
             </div>
             <span className="text-[9px] text-[#A78BFA] font-bold uppercase bg-purple-50 border border-purple-100/60 px-1.5 py-0.5 rounded-md">
               Gemini 3.5 Flash
@@ -2582,7 +2590,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-xs text-gray-900 leading-none">AI 코치</h3>
-                  <p className="text-[9px] text-gray-400 font-semibold mt-1">시장 데이터 · 구성 기준 · AI 에이전트</p>
+                  <p className="text-[9px] text-gray-400 font-semibold mt-0.5">만든 기획서를 검토해요</p>
                 </div>
               </div>
               <div className="flex items-center space-x-1">
@@ -2662,6 +2670,104 @@ export default function App() {
                 )}
               </div>
 
+              {/* ③-2 추가 리서치 필요 항목 — 구성 기준 앞에 배치 */}
+              {(() => {
+                type ResearchContent = { description: string; points: string[]; prompts: string[] };
+                const RESEARCH_MAP: Record<string, ResearchContent> = {
+                  '문제-솔루션 연결': { description: '현재 정의된 문제와 제안된 솔루션 사이의 논리적 연결이 충분한지 검증 필요', points: ['동일 문제를 해결한 타사 서비스의 솔루션 접근 방식', '이 솔루션이 문제의 근본 원인을 해결하는지 여부', '유저가 이 솔루션을 선택할 이유 (대안 대비 차별점)'], prompts: ['다음 기획안에서 문제 정의와 솔루션 사이의 논리적 연결을 검토해줘.\n문제의 근본 원인이 솔루션으로 직접 해결되는지,\n유저가 이 솔루션을 선택할 이유가 명확한지 짚어줘.\n타사에서 유사한 문제를 어떻게 해결했는지도 알려줘.\n[기획안 내용 붙여넣기]', '다음 기획안의 솔루션이 문제를 해결하는 가장 효율적인 방법인지 검토해줘.\n대안 솔루션과 비교했을 때 이 방식을 선택해야 하는 근거를 제시해줘.\n[기획안 내용 붙여넣기]', "다음 기획안에서 '왜 이 솔루션인가'에 대한 근거가 충분한지 Mom Test 관점으로 검토해줘.\n유저가 실제로 이 문제를 해결하기 위해 돈을 낼 의향이 있는지,\n과거 행동 기반으로 판단할 수 있는 질문을 제안해줘.\n[기획안 내용 붙여넣기]"] },
+                  '한 줄 정의': { description: '서비스의 핵심 가치를 한 문장으로 압축했을 때 타겟 유저에게 명확하게 전달되는지 검증 필요', points: ['경쟁 서비스들의 한 줄 정의 표현 방식 비교', '타겟 유저가 즉시 이해할 수 있는 언어 수준인지', '차별화 포인트가 한 문장 안에 포함되어 있는지'], prompts: ['다음 서비스의 한 줄 정의를 검토해줘.\n타겟 유저가 처음 봤을 때 5초 안에 이해할 수 있는지,\n경쟁 서비스 대비 차별점이 드러나는지 평가해줘.\n더 명확한 대안 문장 3개도 제안해줘.\n[한 줄 정의 붙여넣기]', '다음 한 줄 정의가 타겟 유저의 언어로 작성됐는지 검토해줘.\n기획자 관점이 아니라 유저 관점에서 읽었을 때\n나를 위한 서비스다라고 느껴지는지 평가하고 개선안을 제시해줘.\n[한 줄 정의 붙여넣기]', '다음 한 줄 정의와 유사한 포지셔닝을 가진 경쟁 서비스 3개를 찾아줘.\n각각의 한 줄 정의와 비교해서 우리 서비스만의 차별점이 충분히 드러나는지 분석해줘.\n[한 줄 정의 붙여넣기]'] },
+                  '타겟 명확성': { description: '타겟 사용자 정의가 충분히 구체적이고 실행 가능한 수준인지 검증 필요', points: ['타겟 사용자의 직군·연령·니즈가 구체적으로 명시되어 있는지', '"모든 사람"처럼 광범위한 정의가 없는지', '세분화된 페르소나 기반으로 검증 가능한지'], prompts: ['다음 PRD의 타겟 사용자 정의가 충분히 구체적인지 검토해줘.\n직군, 연령대, 핵심 니즈, 현재 대안 대비 불편함이 명시되어 있는지 확인하고\n모든 사람 같은 광범위한 정의가 있다면 세분화 방법을 구체적으로 제안해줘.\n[PRD 내용 붙여넣기]', '다음 타겟 정의를 페르소나 관점에서 검토해줘.\n이 타겟이 실제로 존재하는 사람인지, 인터뷰로 찾을 수 있는지,\n이들의 하루 루틴에서 이 서비스가 필요한 순간을 구체적으로 설명해줘.\n[타겟 정의 붙여넣기]', '다음 타겟 정의로 타겟팅 광고를 집행한다고 가정할 때\nFacebook/Instagram 타겟 설정 기준으로 구체화할 수 있는지 평가해줘.\n더 좁히거나 넓혀야 할 부분을 근거와 함께 제안해줘.\n[타겟 정의 붙여넣기]'] },
+                  '기능 의존 순서': { description: '기능 간 선행 조건과 의존 관계가 명확히 정의되어 있는지 검증 필요', points: ['A 기능 완료 후 B 기능이 가능한 의존 관계 명시 여부', '개발 순서에 영향을 미치는 블로킹 의존성 파악', 'MVP 범위와 이후 단계 기능의 명확한 구분'], prompts: ['다음 기능명세서에서 각 기능의 선행 조건과 의존 관계를 검토해줘.\nA 기능이 완료돼야 B 기능이 동작하는 경우를 모두 찾아서\n의존 순서가 누락된 부분을 구체적으로 지적해줘.\n[기능명세서 내용 붙여넣기]', '다음 기능명세서를 개발 스프린트 순서로 재배열해줘.\n어떤 기능이 먼저 개발되어야 하는지, 병렬로 진행 가능한 기능은 무엇인지\n의존성 다이어그램 형태로 정리해줘.\n[기능명세서 내용 붙여넣기]', '다음 기능 중 MVP에 포함해야 할 핵심 기능과\n이후 단계에서 추가해도 되는 기능을 선행 의존 관계 기준으로 분류해줘.\n각 판단의 근거도 함께 설명해줘.\n[기능명세서 내용 붙여넣기]'] },
+                  '핵심-부가 구분': { description: 'MVP 필수 기능과 부가 기능이 명확히 구분되어 우선순위가 설정되어 있는지 검증 필요', points: ['Must/Should/Could 우선순위 기준 적용 여부', 'MVP 범위를 초과하는 기능 포함 여부', '각 기능의 비즈니스 임팩트 대비 개발 비용 분석'], prompts: ['다음 기능명세서에서 핵심 기능과 부가 기능을 구분해줘.\nMVP에 반드시 필요한 기능과 나중에 추가해도 되는 기능을\n각각 이유와 함께 정리해줘.\n[기능명세서 내용 붙여넣기]', '다음 기능 목록을 MoSCoW 방식으로 분류해줘.\n각 기능을 분류한 이유와 함께, MVP 버전에서 제외해야 할 기능을 명확히 짚어줘.\n[기능명세서 내용 붙여넣기]', '다음 기능 중 구현 난이도 대비 유저 임팩트가 낮은 기능을 찾아줘.\n2x2 매트릭스로 분류하고 제거하거나 간소화해야 할 기능을 구체적으로 제안해줘.\n[기능명세서 내용 붙여넣기]'] },
+                  '엣지 케이스 정의': { description: '예외 상황과 오류 흐름이 기능명세서에 명시되어 있는지 검증 필요', points: ['네트워크 오류·빈 상태·권한 없음 등 예외 상황 정의', '각 기능의 입력값 유효성 검사 및 경계값 처리', '오류 발생 시 유저에게 표시할 메시지와 복구 경로'], prompts: ['다음 기능명세서에서 엣지 케이스가 정의되지 않은 기능을 찾아줘.\n네트워크 오류, 빈 상태, 권한 없음, 입력값 초과 등\n일반적인 엣지 케이스 유형 기준으로 빠진 부분을 목록으로 정리해줘.\n[기능명세서 내용 붙여넣기]', '다음 기능명세서의 각 기능에 대해 What-if 시나리오를 작성해줘.\n각 상황에서 서비스가 어떻게 반응해야 하는지 정의해줘.\n[기능명세서 내용 붙여넣기]', '다음 기능명세서에서 운영 환경에서 실제로 발생할 수 있는 엣지 케이스를 찾아줘.\n각 케이스별 대응 방안을 제안해줘.\n[기능명세서 내용 붙여넣기]'] },
+                  '진입 경로 수': { description: '서비스 진입 경로가 실제 유저 행동 패턴을 충분히 반영하는지 검증 필요', points: ['직접 탐색·알림·공유 링크 등 주요 진입 유형 포함 여부', '각 진입 경로별 첫 화면 차별화 여부', '딥링크 및 외부 유입 시나리오 고려 여부'], prompts: ['다음 유저플로우에서 서비스 진입 경로가 충분히 포함되어 있는지 검토해줘.\n누락된 진입 경로와 각 경로에서 달라져야 할 첫 화면을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]', '다음 유저플로우의 진입 경로를 신규 유저와 재방문 유저로 나누어 검토해줘.\n각 유형별로 최적화된 첫 화면 경험이 설계되어 있는지 확인해줘.\n[유저플로우 내용 붙여넣기]', '유사 서비스의 진입 경로 설계를 참고해서 다음 유저플로우에서 놓친 진입 경로를 찾아줘.\n[유저플로우 내용 붙여넣기]'] },
+                  '오류 흐름 포함': { description: '오류 상황과 복구 흐름이 유저플로우에 명시되어 있는지 검증 필요', points: ['로그인 실패·네트워크 단절·권한 거부 등 오류 분기 포함', '각 오류 노드에서 복구 경로가 1개 이상 연결되어 있는지', '오류 메시지와 유저 안내 문구 정의 여부'], prompts: ['다음 유저플로우에서 오류 상황과 복구 흐름이 누락된 노드를 찾아줘.\n각 오류에 대한 복구 경로를 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]', '다음 유저플로우의 각 단계에서 발생 가능한 오류를 사용자 관점으로 시뮬레이션해줘.\n오류 UX를 개선하는 구체적인 방법을 제안해줘.\n[유저플로우 내용 붙여넣기]', '다음 유저플로우에 Error Path와 Edge Path를 추가해줘.\n각 경로별로 유저에게 표시할 메시지와 다음 행동 유도 방법을 정의해줘.\n[유저플로우 내용 붙여넣기]'] },
+                  '단계 간결성': { description: '유저플로우의 각 경로에서 단계 수가 이탈 없이 완료 가능한 수준인지 검증 필요', points: ['온보딩·핵심 기능 도달까지 탭 수 측정', '업계 기준(온보딩 3단계 이내) 충족 여부', '통합 가능한 화면과 제거 가능한 단계 식별'], prompts: ['다음 유저플로우의 각 경로에서 단계 수가 적절한지 검토해줘.\n줄일 수 있는 단계와 통합 가능한 화면을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]', '다음 유저플로우에서 유저 이탈이 가장 많이 발생할 것 같은 단계를 예측해줘.\n이탈률을 낮출 수 있는 방법을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]', 'Toss, 카카오, 당근마켓의 온보딩 단계 수를 기준으로 다음 유저플로우의 간결성을 평가해줘.\n[유저플로우 내용 붙여넣기]'] },
+                  'CTA 위치': { description: 'CTA(핵심 행동 버튼)의 위치가 유저의 시선 흐름과 행동 패턴에 최적화되어 있는지 검증 필요', points: ['스크롤 없이 보이는 영역(Fold 위)에 CTA 배치 여부', 'CTA가 경쟁 요소와 혼재되지 않는지', '모바일 엄지 손가락 도달 범위 내 위치 여부'], prompts: ['다음 와이어프레임에서 CTA의 위치가 적절한지 검토해줘.\nCTA가 묻히거나 경쟁 요소와 혼재된 화면을 찾아 개선 방향을 제안해줘.\n[와이어프레임 설명 붙여넣기]', '다음 와이어프레임의 CTA 배치를 모바일 UX 관점에서 검토해줘.\n엄지 손가락 도달 범위 기준으로 분석하고 개선안을 제시해줘.\n[와이어프레임 설명 붙여넣기]', 'Coupang, 토스, 카카오페이의 CTA 배치 원칙을 참고해서 개선 방법을 제안해줘.\n[와이어프레임 설명 붙여넣기]'] },
+                  '스크롤 깊이': { description: '핵심 정보와 CTA가 과도한 스크롤 없이 전달되는지 검증 필요', points: ['모바일 기준 3스크롤 이내 핵심 가치 전달 여부', '콘텐츠 우선순위에 따른 화면 배치 적절성', '정보 과부하로 인한 스크롤 피로 발생 가능성'], prompts: ['다음 와이어프레임에서 각 화면의 스크롤 깊이가 적절한지 검토해줘.\n정보 구조를 재편하는 구체적인 방법을 제안해줘.\n[와이어프레임 설명 붙여넣기]', '다음 와이어프레임을 3-Scroll Rule 기준으로 평가해줘.\n개선안을 제시해줘.\n[와이어프레임 설명 붙여넣기]', '다음 와이어프레임에서 Fold 아래 숨겨진 중요 콘텐츠를 찾아줘.\n화면 상단으로 올리거나 구조를 재편하는 방법을 제안해줘.\n[와이어프레임 설명 붙여넣기]'] },
+                  '레이아웃 일관성': { description: '화면 간 버튼 위치·타이포그래피·간격이 일관된 디자인 시스템을 따르는지 검증 필요', points: ['버튼 크기·위치·색상 화면 간 통일성', '타이포그래피(폰트 크기·굵기·색상) 일관성', '여백(padding/margin) 규칙의 시스템화 여부'], prompts: ['다음 와이어프레임에서 화면 간 레이아웃 일관성을 검토해줘.\n통일해야 할 디자인 규칙을 구체적으로 제안해줘.\n[와이어프레임 설명 붙여넣기]', '다음 와이어프레임을 기반으로 기본 디자인 시스템을 정의해줘.\n실제 개발에 바로 사용할 수 있는 형태로 정리해줘.\n[와이어프레임 설명 붙여넣기]', 'Airbnb DLS, Toss Design System을 참고해서 즉시 개선해야 할 불일치 요소 Top 3를 제안해줘.\n[와이어프레임 설명 붙여넣기]'] },
+                };
+
+                const validStatuses2 = ['충족', '검토필요', '미흡'] as const;
+                type SKey2 = typeof validStatuses2[number];
+                const researchItems = aiCriteria.filter(item => {
+                  const cur: SKey2 = validStatuses2.includes(checklistStatus[item.id] as SKey2)
+                    ? (checklistStatus[item.id] as SKey2)
+                    : validStatuses2.includes(item.status as SKey2)
+                    ? (item.status as SKey2)
+                    : '검토필요';
+                  return cur === '검토필요' || cur === '미흡';
+                });
+                if (researchItems.length === 0) return null;
+
+                return (
+                  <div className="bg-white border border-orange-200 rounded-xl shadow-3xs overflow-hidden">
+                    <div className="px-3.5 py-2.5 border-b border-orange-100 bg-orange-50/60 flex items-center gap-1.5">
+                      <span className="text-[10px] font-black text-orange-600">🔍 추가 리서치 필요</span>
+                      <span className="text-[9px] bg-orange-100 text-orange-500 font-black px-1.5 py-0.5 rounded-full">{researchItems.length}</span>
+                    </div>
+                    <div className="p-3 space-y-4">
+                      {researchItems.map(item => {
+                        const content = RESEARCH_MAP[item.label];
+                        const state = researchState[item.id] || { versionIndex: 0, isCopied: false };
+                        const prompts = content?.prompts || [item.reviewPrompt];
+                        const currentPrompt = prompts[state.versionIndex % prompts.length];
+                        return (
+                          <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                            <div className="px-3 py-2 bg-orange-50/40 border-b border-orange-100/60">
+                              <p className="text-[11px] font-black text-orange-700">{item.label}</p>
+                            </div>
+                            <div className="px-3 pt-2.5 pb-3 space-y-2.5">
+                              {content && (
+                                <>
+                                  <div>
+                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">어떤 리서치가 필요한가</p>
+                                    <p className="text-[10.5px] text-gray-600 font-medium leading-relaxed">{content.description}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">구체적 리서치 사항</p>
+                                    <ul className="space-y-0.5">
+                                      {content.points.map((pt, i) => (
+                                        <li key={i} className="text-[10.5px] text-gray-600 font-medium leading-relaxed flex gap-1.5">
+                                          <span className="text-orange-400 shrink-0">·</span>
+                                          <span>{pt}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </>
+                              )}
+                              <div className="relative">
+                                <div className="bg-[#F5F5F5] border border-[#E0E0E0] rounded-lg p-3">
+                                  <p className="text-[10.5px] text-gray-500 font-medium leading-relaxed whitespace-pre-wrap">{currentPrompt}</p>
+                                </div>
+                                <div className="flex items-center justify-end gap-1.5 mt-1.5">
+                                  <button
+                                    type="button"
+                                    title="다른 프롬프트 보기"
+                                    onClick={() => setResearchState(prev => ({
+                                      ...prev,
+                                      [item.id]: { versionIndex: ((prev[item.id]?.versionIndex ?? 0) + 1) % prompts.length, isCopied: false },
+                                    }))}
+                                    className="w-6 h-6 flex items-center justify-center text-[12px] text-gray-400 hover:text-orange-500 rounded-md hover:bg-orange-50 transition-all hover:rotate-180 duration-300"
+                                  >↺</button>
+                                  <span className="text-[9px] text-gray-300 font-medium">{state.versionIndex + 1}/{prompts.length}</span>
+                                  <button
+                                    type="button"
+                                    disabled={state.isCopied}
+                                    onClick={() => { navigator.clipboard.writeText(currentPrompt); setResearchState(prev => ({ ...prev, [item.id]: { ...state, isCopied: true } })); }}
+                                    className={`text-[9px] font-black px-2 py-1 rounded-lg border transition-all whitespace-nowrap ${state.isCopied ? 'text-green-600 bg-green-50 border-green-200 cursor-default' : 'text-orange-500 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border-orange-200 hover:border-orange-300 active:scale-95'}`}
+                                  >{state.isCopied ? '복사됨 ✓' : '프롬프트 복사 📋'}</button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
               {/* ② 구성 기준 — AI 동적 생성 */}
               <div className="bg-white border border-gray-200 rounded-xl shadow-3xs">
                 <div className="px-3.5 py-2.5 border-b border-gray-100 flex items-center justify-between">
@@ -2745,229 +2851,8 @@ export default function App() {
                   );
                 })()}
               </div>
+
 
-              {/* ③-2 추가 리서치 필요 항목 */}
-              {(() => {
-                type ResearchContent = {
-                  description: string;
-                  points: string[];
-                  prompts: string[];
-                };
-                const RESEARCH_MAP: Record<string, ResearchContent> = {
-                  '문제-솔루션 연결': {
-                    description: '현재 정의된 문제와 제안된 솔루션 사이의 논리적 연결이 충분한지 검증 필요',
-                    points: ['동일 문제를 해결한 타사 서비스의 솔루션 접근 방식', '이 솔루션이 문제의 근본 원인을 해결하는지 여부', '유저가 이 솔루션을 선택할 이유 (대안 대비 차별점)'],
-                    prompts: [
-                      `다음 기획안에서 문제 정의와 솔루션 사이의 논리적 연결을 검토해줘.\n문제의 근본 원인이 솔루션으로 직접 해결되는지,\n유저가 이 솔루션을 선택할 이유가 명확한지 짚어줘.\n타사에서 유사한 문제를 어떻게 해결했는지도 알려줘.\n[기획안 내용 붙여넣기]`,
-                      `다음 기획안의 솔루션이 문제를 해결하는 가장 효율적인 방법인지 검토해줘.\n대안 솔루션과 비교했을 때 이 방식을 선택해야 하는 근거를 제시해줘.\n[기획안 내용 붙여넣기]`,
-                      `다음 기획안에서 '왜 이 솔루션인가'에 대한 근거가 충분한지 Mom Test 관점으로 검토해줘.\n유저가 실제로 이 문제를 해결하기 위해 돈을 낼 의향이 있는지,\n과거 행동 기반으로 판단할 수 있는 질문을 제안해줘.\n[기획안 내용 붙여넣기]`,
-                    ],
-                  },
-                  '한 줄 정의': {
-                    description: '서비스의 핵심 가치를 한 문장으로 압축했을 때 타겟 유저에게 명확하게 전달되는지 검증 필요',
-                    points: ['경쟁 서비스들의 한 줄 정의 표현 방식 비교', '타겟 유저가 즉시 이해할 수 있는 언어 수준인지', '차별화 포인트가 한 문장 안에 포함되어 있는지'],
-                    prompts: [
-                      `다음 서비스의 한 줄 정의를 검토해줘.\n타겟 유저가 처음 봤을 때 5초 안에 이해할 수 있는지,\n경쟁 서비스 대비 차별점이 드러나는지 평가해줘.\n더 명확한 대안 문장 3개도 제안해줘.\n[한 줄 정의 붙여넣기]`,
-                      `다음 한 줄 정의가 타겟 유저의 언어로 작성됐는지 검토해줘.\n기획자 관점이 아니라 유저 관점에서 읽었을 때\n'나를 위한 서비스다'라고 느껴지는지 평가하고 개선안을 제시해줘.\n[한 줄 정의 붙여넣기]`,
-                      `다음 한 줄 정의와 유사한 포지셔닝을 가진 경쟁 서비스 3개를 찾아줘.\n각각의 한 줄 정의와 비교해서 우리 서비스만의 차별점이 충분히 드러나는지 분석해줘.\n[한 줄 정의 붙여넣기]`,
-                    ],
-                  },
-                  '타겟 명확성': {
-                    description: '타겟 사용자 정의가 충분히 구체적이고 실행 가능한 수준인지 검증 필요',
-                    points: ['타겟 사용자의 직군·연령·니즈가 구체적으로 명시되어 있는지', '"모든 사람"처럼 광범위한 정의가 없는지', '세분화된 페르소나 기반으로 검증 가능한지'],
-                    prompts: [
-                      `다음 PRD의 타겟 사용자 정의가 충분히 구체적인지 검토해줘.\n직군, 연령대, 핵심 니즈, 현재 대안 대비 불편함이 명시되어 있는지 확인하고\n"모든 사람" 같은 광범위한 정의가 있다면 세분화 방법을 구체적으로 제안해줘.\n[PRD 내용 붙여넣기]`,
-                      `다음 타겟 정의를 페르소나 관점에서 검토해줘.\n이 타겟이 실제로 존재하는 사람인지, 인터뷰로 찾을 수 있는지,\n이들의 하루 루틴에서 이 서비스가 필요한 순간을 구체적으로 설명해줘.\n[타겟 정의 붙여넣기]`,
-                      `다음 타겟 정의로 타겟팅 광고를 집행한다고 가정할 때\nFacebook/Instagram 타겟 설정 기준으로 구체화할 수 있는지 평가해줘.\n더 좁히거나 넓혀야 할 부분을 근거와 함께 제안해줘.\n[타겟 정의 붙여넣기]`,
-                    ],
-                  },
-                  '기능 의존 순서': {
-                    description: '기능 간 선행 조건과 의존 관계가 명확히 정의되어 있는지 검증 필요',
-                    points: ['A 기능 완료 후 B 기능이 가능한 의존 관계 명시 여부', '개발 순서에 영향을 미치는 블로킹 의존성 파악', 'MVP 범위와 이후 단계 기능의 명확한 구분'],
-                    prompts: [
-                      `다음 기능명세서에서 각 기능의 선행 조건과 의존 관계를 검토해줘.\nA 기능이 완료돼야 B 기능이 동작하는 경우를 모두 찾아서\n의존 순서가 누락된 부분을 구체적으로 지적해줘.\n[기능명세서 내용 붙여넣기]`,
-                      `다음 기능명세서를 개발 스프린트 순서로 재배열해줘.\n어떤 기능이 먼저 개발되어야 하는지, 병렬로 진행 가능한 기능은 무엇인지\n의존성 다이어그램 형태로 정리해줘.\n[기능명세서 내용 붙여넣기]`,
-                      `다음 기능 중 MVP에 포함해야 할 핵심 기능과\n이후 단계에서 추가해도 되는 기능을 선행 의존 관계 기준으로 분류해줘.\n각 판단의 근거도 함께 설명해줘.\n[기능명세서 내용 붙여넣기]`,
-                    ],
-                  },
-                  '핵심-부가 구분': {
-                    description: 'MVP 필수 기능과 부가 기능이 명확히 구분되어 우선순위가 설정되어 있는지 검증 필요',
-                    points: ['Must/Should/Could 우선순위 기준 적용 여부', 'MVP 범위를 초과하는 기능 포함 여부', '각 기능의 비즈니스 임팩트 대비 개발 비용 분석'],
-                    prompts: [
-                      `다음 기능명세서에서 핵심 기능과 부가 기능을 구분해줘.\nMVP에 반드시 필요한 기능과 나중에 추가해도 되는 기능을\n각각 이유와 함께 정리해줘.\n[기능명세서 내용 붙여넣기]`,
-                      `다음 기능 목록을 MoSCoW 방식(Must/Should/Could/Won't)으로 분류해줘.\n각 기능을 분류한 이유와 함께, MVP 버전에서 제외해야 할 기능을 명확히 짚어줘.\n[기능명세서 내용 붙여넣기]`,
-                      `다음 기능 중 구현 난이도 대비 유저 임팩트가 낮은 기능을 찾아줘.\n2x2 매트릭스(임팩트 높음/낮음 × 난이도 높음/낮음)로 분류하고\n제거하거나 간소화해야 할 기능을 구체적으로 제안해줘.\n[기능명세서 내용 붙여넣기]`,
-                    ],
-                  },
-                  '엣지 케이스 정의': {
-                    description: '예외 상황과 오류 흐름이 기능명세서에 명시되어 있는지 검증 필요',
-                    points: ['네트워크 오류·빈 상태·권한 없음 등 예외 상황 정의', '각 기능의 입력값 유효성 검사 및 경계값 처리', '오류 발생 시 유저에게 표시할 메시지와 복구 경로'],
-                    prompts: [
-                      `다음 기능명세서에서 엣지 케이스가 정의되지 않은 기능을 찾아줘.\n네트워크 오류, 빈 상태, 권한 없음, 입력값 초과 등\n일반적인 엣지 케이스 유형 기준으로 빠진 부분을 목록으로 정리해줘.\n[기능명세서 내용 붙여넣기]`,
-                      `다음 기능명세서의 각 기능에 대해 What-if 시나리오를 작성해줘.\n"만약 유저가 ~를 한다면?" 형태로 최소 3개씩 예외 상황을 생성하고\n각 상황에서 서비스가 어떻게 반응해야 하는지 정의해줘.\n[기능명세서 내용 붙여넣기]`,
-                      `다음 기능명세서에서 동시 접속자 증가, 데이터 없음, 서버 타임아웃 등\n운영 환경에서 실제로 발생할 수 있는 엣지 케이스를 찾아줘.\n각 케이스별 대응 방안(fallback UI, 에러 메시지, 재시도 로직)을 제안해줘.\n[기능명세서 내용 붙여넣기]`,
-                    ],
-                  },
-                  '진입 경로 수': {
-                    description: '서비스 진입 경로가 실제 유저 행동 패턴을 충분히 반영하는지 검증 필요',
-                    points: ['직접 탐색·알림·공유 링크 등 주요 진입 유형 포함 여부', '각 진입 경로별 첫 화면 차별화 여부', '딥링크 및 외부 유입 시나리오 고려 여부'],
-                    prompts: [
-                      `다음 유저플로우에서 서비스 진입 경로가 충분히 포함되어 있는지 검토해줘.\n직접 탐색, 알림, 공유 링크, 외부 유입 등 주요 진입 유형이 모두 커버되는지 확인하고\n누락된 진입 경로와 각 경로에서 달라져야 할 첫 화면을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]`,
-                      `다음 유저플로우의 진입 경로를 신규 유저와 재방문 유저로 나누어 검토해줘.\n각 유형별로 최적화된 첫 화면 경험이 설계되어 있는지 확인하고\n부족한 부분을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]`,
-                      `유사 서비스(카카오, 당근마켓, Toss)의 진입 경로 설계를 참고해서\n다음 유저플로우에서 놓친 진입 경로를 찾아줘.\n각 진입 경로 추가 시 유저 리텐션에 미치는 영향도 분석해줘.\n[유저플로우 내용 붙여넣기]`,
-                    ],
-                  },
-                  '오류 흐름 포함': {
-                    description: '오류 상황과 복구 흐름이 유저플로우에 명시되어 있는지 검증 필요',
-                    points: ['로그인 실패·네트워크 단절·권한 거부 등 오류 분기 포함', '각 오류 노드에서 복구 경로가 1개 이상 연결되어 있는지', '오류 메시지와 유저 안내 문구 정의 여부'],
-                    prompts: [
-                      `다음 유저플로우에서 오류 상황과 복구 흐름이 누락된 노드를 찾아줘.\n로그인 실패, 네트워크 단절, 권한 거부, 데이터 로드 실패 등\n발생 가능한 오류 유형별로 현재 플로우에 빠진 분기를 목록으로 정리하고\n각 오류에 대한 복구 경로를 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]`,
-                      `다음 유저플로우의 각 단계에서 발생 가능한 오류를 사용자 관점으로 시뮬레이션해줘.\n유저가 오류를 만났을 때 느끼는 감정과 이탈 가능성을 평가하고\n오류 UX를 개선하는 구체적인 방법을 제안해줘.\n[유저플로우 내용 붙여넣기]`,
-                      `다음 유저플로우에 Happy Path(정상 흐름) 외에\nError Path(오류 흐름)와 Edge Path(예외 흐름)를 추가해줘.\n각 경로별로 유저에게 표시할 메시지와 다음 행동 유도 방법을 정의해줘.\n[유저플로우 내용 붙여넣기]`,
-                    ],
-                  },
-                  '단계 간결성': {
-                    description: '유저플로우의 각 경로에서 단계 수가 이탈 없이 완료 가능한 수준인지 검증 필요',
-                    points: ['온보딩·핵심 기능 도달까지 탭 수 측정', '업계 기준(온보딩 3단계 이내) 충족 여부', '통합 가능한 화면과 제거 가능한 단계 식별'],
-                    prompts: [
-                      `다음 유저플로우의 각 경로에서 단계 수가 적절한지 검토해줘.\n특히 온보딩·가입·핵심 기능 도달까지 몇 번의 탭이 필요한지 세어보고\n업계 기준(온보딩 3단계 이내, 핵심 기능 2탭 이내)과 비교해서\n줄일 수 있는 단계와 통합 가능한 화면을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]`,
-                      `다음 유저플로우에서 유저 이탈이 가장 많이 발생할 것 같은 단계를 예측해줘.\n각 단계의 이탈 원인을 분석하고, 단계를 줄이거나 순서를 바꿔서\n이탈률을 낮출 수 있는 방법을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]`,
-                      `Toss, 카카오, 당근마켓의 온보딩 단계 수를 기준으로\n다음 유저플로우의 간결성을 평가해줘.\n업계 최고 수준과 비교했을 때 개선해야 할 부분을 구체적으로 짚어줘.\n[유저플로우 내용 붙여넣기]`,
-                    ],
-                  },
-                  'CTA 위치': {
-                    description: 'CTA(핵심 행동 버튼)의 위치가 유저의 시선 흐름과 행동 패턴에 최적화되어 있는지 검증 필요',
-                    points: ['스크롤 없이 보이는 영역(Fold 위)에 CTA 배치 여부', 'CTA가 경쟁 요소와 혼재되지 않는지', '모바일 엄지 손가락 도달 범위 내 위치 여부'],
-                    prompts: [
-                      `다음 와이어프레임에서 CTA(핵심 행동 버튼)의 위치가 적절한지 검토해줘.\n각 화면에서 CTA가 스크롤 없이 보이는 영역(Fold 위)에 배치되어 있는지 확인하고\nCTA가 묻히거나 경쟁 요소와 혼재된 화면을 찾아 개선 방향을 제안해줘.\n[와이어프레임 설명 붙여넣기]`,
-                      `다음 와이어프레임의 CTA 배치를 모바일 UX 관점에서 검토해줘.\n엄지 손가락 도달 범위(Thumb Zone) 기준으로 CTA가 올바른 위치에 있는지,\n원핸드 사용 시 불편한 위치는 없는지 분석하고 개선안을 제시해줘.\n[와이어프레임 설명 붙여넣기]`,
-                      `Coupang, 토스, 카카오페이의 CTA 배치 원칙을 참고해서\n다음 와이어프레임에서 CTA 위치를 개선할 방법을 제안해줘.\n각 화면별로 전환율을 높일 수 있는 CTA 최적 위치를 구체적으로 알려줘.\n[와이어프레임 설명 붙여넣기]`,
-                    ],
-                  },
-                  '스크롤 깊이': {
-                    description: '핵심 정보와 CTA가 과도한 스크롤 없이 전달되는지 검증 필요',
-                    points: ['모바일 기준 3스크롤 이내 핵심 가치 전달 여부', '콘텐츠 우선순위에 따른 화면 배치 적절성', '정보 과부하로 인한 스크롤 피로 발생 가능성'],
-                    prompts: [
-                      `다음 와이어프레임에서 각 화면의 스크롤 깊이가 적절한지 검토해줘.\n모바일 기준 3스크롤 이내에 핵심 가치가 전달되는지 확인하고\n콘텐츠가 너무 길거나 중요 정보가 스크롤 하단에 묻혀 있는 화면을 찾아\n정보 구조를 재편하는 구체적인 방법을 제안해줘.\n[와이어프레임 설명 붙여넣기]`,
-                      `다음 와이어프레임을 3-Scroll Rule 기준으로 평가해줘.\n1스크롤(핵심 가치), 2스크롤(신뢰 요소), 3스크롤(행동 유도) 구조로\n현재 콘텐츠가 올바르게 배치되어 있는지 분석하고 개선안을 제시해줘.\n[와이어프레임 설명 붙여넣기]`,
-                      `다음 와이어프레임에서 접히는 영역(Fold) 아래 숨겨진 중요 콘텐츠를 찾아줘.\n유저가 스크롤하지 않으면 볼 수 없는 핵심 정보나 CTA가 있다면\n화면 상단으로 올리거나 구조를 재편하는 방법을 제안해줘.\n[와이어프레임 설명 붙여넣기]`,
-                    ],
-                  },
-                  '레이아웃 일관성': {
-                    description: '화면 간 버튼 위치·타이포그래피·간격이 일관된 디자인 시스템을 따르는지 검증 필요',
-                    points: ['버튼 크기·위치·색상 화면 간 통일성', '타이포그래피(폰트 크기·굵기·색상) 일관성', '여백(padding/margin) 규칙의 시스템화 여부'],
-                    prompts: [
-                      `다음 와이어프레임에서 화면 간 레이아웃 일관성을 검토해줘.\n버튼 위치, 여백(padding/margin), 타이포그래피, 아이콘 스타일이\n화면마다 달라지는 부분을 찾아 목록으로 정리하고\n통일해야 할 디자인 규칙을 구체적으로 제안해줘.\n[와이어프레임 설명 붙여넣기]`,
-                      `다음 와이어프레임을 기반으로 기본 디자인 시스템을 정의해줘.\n버튼 스타일, 색상 팔레트, 타이포그래피 스케일, 간격 단위를\n실제 개발에 바로 사용할 수 있는 형태로 정리해줘.\n[와이어프레임 설명 붙여넣기]`,
-                      `Airbnb DLS, Toss Design System을 참고해서\n다음 와이어프레임의 레이아웃 일관성 수준을 평가해줘.\n즉시 개선해야 할 불일치 요소 Top 3와 각 해결 방법을 제안해줘.\n[와이어프레임 설명 붙여넣기]`,
-                    ],
-                  },
-                };
-
-                const validStatuses = ['충족', '검토필요', '미흡'] as const;
-                type SKey = typeof validStatuses[number];
-                const researchItems = aiCriteria.filter(item => {
-                  const cur: SKey = validStatuses.includes(checklistStatus[item.id] as SKey)
-                    ? (checklistStatus[item.id] as SKey)
-                    : validStatuses.includes(item.status as SKey)
-                    ? (item.status as SKey)
-                    : '검토필요';
-                  return cur === '검토필요' || cur === '미흡';
-                });
-                if (researchItems.length === 0) return null;
-
-                return (
-                  <div className="bg-white border border-orange-200 rounded-xl shadow-3xs overflow-hidden">
-                    <div className="px-3.5 py-2.5 border-b border-orange-100 bg-orange-50/60 flex items-center gap-1.5">
-                      <span className="text-[10px] font-black text-orange-600">🔍 추가 리서치 필요</span>
-                      <span className="text-[9px] bg-orange-100 text-orange-500 font-black px-1.5 py-0.5 rounded-full">{researchItems.length}</span>
-                    </div>
-                    <div className="p-3 space-y-4">
-                      {researchItems.map(item => {
-                        const content = RESEARCH_MAP[item.label];
-                        const state = researchState[item.id] || { versionIndex: 0, isCopied: false };
-                        const prompts = content?.prompts || [item.reviewPrompt];
-                        const currentPrompt = prompts[state.versionIndex % prompts.length];
-
-                        return (
-                          <div key={item.id} className="border border-gray-100 rounded-xl overflow-hidden">
-                            {/* 항목 헤더 */}
-                            <div className="px-3 py-2 bg-orange-50/40 border-b border-orange-100/60">
-                              <p className="text-[11px] font-black text-orange-700">{item.label}</p>
-                            </div>
-                            <div className="px-3 pt-2.5 pb-3 space-y-2.5">
-                              {/* 어떤 리서치가 필요한가 */}
-                              {content && (
-                                <>
-                                  <div>
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">어떤 리서치가 필요한가</p>
-                                    <p className="text-[10.5px] text-gray-600 font-medium leading-relaxed">{content.description}</p>
-                                  </div>
-                                  {/* 구체적 리서치 사항 */}
-                                  <div>
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1">구체적 리서치 사항</p>
-                                    <ul className="space-y-0.5">
-                                      {content.points.map((pt, i) => (
-                                        <li key={i} className="text-[10.5px] text-gray-600 font-medium leading-relaxed flex gap-1.5">
-                                          <span className="text-orange-400 shrink-0">·</span>
-                                          <span>{pt}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                </>
-                              )}
-                              {/* 프롬프트 박스 */}
-                              <div className="relative">
-                                <div className="bg-[#F5F5F5] border border-[#E0E0E0] rounded-lg p-3">
-                                  <p className="text-[10.5px] text-gray-500 font-medium leading-relaxed whitespace-pre-wrap">{currentPrompt}</p>
-                                </div>
-                                {/* 버튼 행 */}
-                                <div className="flex items-center justify-end gap-1.5 mt-1.5">
-                                  {/* 리셋 버튼 */}
-                                  <button
-                                    type="button"
-                                    title="다른 버전 프롬프트"
-                                    onClick={() => setResearchState(prev => ({
-                                      ...prev,
-                                      [item.id]: {
-                                        versionIndex: ((prev[item.id]?.versionIndex ?? 0) + 1) % prompts.length,
-                                        isCopied: false,
-                                      },
-                                    }))}
-                                    className="w-6 h-6 flex items-center justify-center text-[12px] text-gray-400 hover:text-orange-500 rounded-md hover:bg-orange-50 transition-all hover:rotate-180 duration-300"
-                                  >↺</button>
-                                  {/* 버전 표시 */}
-                                  <span className="text-[9px] text-gray-300 font-medium">{state.versionIndex + 1}/{prompts.length}</span>
-                                  {/* 복사 버튼 */}
-                                  <button
-                                    type="button"
-                                    disabled={state.isCopied}
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(currentPrompt);
-                                      setResearchState(prev => ({
-                                        ...prev,
-                                        [item.id]: { ...state, isCopied: true },
-                                      }));
-                                    }}
-                                    className={`text-[9px] font-black px-2 py-1 rounded-lg border transition-all whitespace-nowrap ${
-                                      state.isCopied
-                                        ? 'text-green-600 bg-green-50 border-green-200 cursor-default'
-                                        : 'text-orange-500 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border-orange-200 hover:border-orange-300 active:scale-95'
-                                    }`}
-                                  >
-                                    {state.isCopied ? '복사됨 ✓' : '프롬프트 복사 📋'}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* ④ AI 에이전트 대화창 */}
               <div className="bg-white border border-gray-200 rounded-xl shadow-3xs overflow-hidden flex flex-col sticky bottom-0 z-10">
@@ -3012,10 +2897,58 @@ export default function App() {
 
         {/* Coach Backdrop for floating state */}
         {coachOpen && !coachPinned && (
-          <div 
+          <div
             className="fixed inset-0 bg-gray-900/10 z-30 backdrop-blur-[0.5px]"
             onClick={() => setCoachOpen(false)}
           />
+        )}
+
+        {/* 공유 모달 */}
+        {shareModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-[2px]"
+            onClick={() => setShareModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-xl border border-gray-200 w-[420px] max-w-[90vw] p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 모달 헤더 */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-black text-gray-900">기획안 공유하기</h2>
+                <button
+                  onClick={() => setShareModalOpen(false)}
+                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 font-medium">아래 링크를 개발자 또는 팀원에게 공유하세요</p>
+              {/* URL 입력창 */}
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+                <input
+                  type="text"
+                  readOnly
+                  value={typeof window !== 'undefined' ? window.location.href : ''}
+                  className="flex-1 bg-transparent text-xs text-gray-700 font-medium outline-none truncate"
+                />
+              </div>
+              {/* 링크 복사 버튼 */}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  setShareLinkCopied(true);
+                }}
+                className={`w-full py-2.5 rounded-xl text-xs font-black transition-all ${
+                  shareLinkCopied
+                    ? 'bg-green-500 text-white cursor-default'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white active:scale-[0.98]'
+                }`}
+              >
+                {shareLinkCopied ? '복사됨 ✓' : '링크 복사'}
+              </button>
+            </div>
+          </div>
         )}
 
       </div>
