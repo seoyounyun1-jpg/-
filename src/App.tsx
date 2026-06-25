@@ -2745,6 +2745,7 @@ export default function App() {
                                   <button
                                     type="button"
                                     title="다른 프롬프트 보기"
+                                    aria-label="다른 프롬프트 보기"
                                     onClick={() => setResearchState(prev => ({
                                       ...prev,
                                       [item.id]: { versionIndex: ((prev[item.id]?.versionIndex ?? 0) + 1) % prompts.length, isCopied: false },
@@ -2851,7 +2852,7 @@ export default function App() {
                   );
                 })()}
               </div>
-
+
 
 
               {/* ④ AI 에이전트 대화창 */}
