@@ -446,7 +446,7 @@ export default function App() {
   const [researchState, setResearchState] = useState<Record<string, { versionIndex: number; isCopied: boolean }>>({});
 
   // ③ AI 구성 기준 동적 생성
-  type AICriterion = { id: string; label: string; status: '충족' | '검토필요' | '미흡'; reason: string; example: string; reviewPrompt: string };
+  type AICriterion = { id: string; label: string; status: '충족' | '검토필요'; reason: string; example: string; reviewPrompt: string };
   const [aiCriteria, setAiCriteria] = useState<AICriterion[]>([]);
   const [criteriaLoading, setCriteriaLoading] = useState<boolean>(false);
 
@@ -454,6 +454,7 @@ export default function App() {
   const [ctxChatHistory, setCtxChatHistory] = useState<{role: 'user' | 'ai'; text: string}[]>([]);
   const [ctxChatInput, setCtxChatInput] = useState<string>('');
   const [ctxChatLoading, setCtxChatLoading] = useState<boolean>(false);
+  const ctxChatEndRef = useRef<HTMLDivElement>(null);
 
   // Flow State
   const [activeFlowId, setActiveFlowId] = useState<string>('flow-1');
@@ -588,7 +589,7 @@ export default function App() {
         '기능명세서': [
           { id: 'f1', label: '기능 의존 순서', status: '검토필요', reason: '기능 목록은 있으나 선행 기능(A 완료 후 B 가능) 의존 관계가 명시되지 않음', example: 'Figma는 기능명세서에 선행 기능 항목을 필수 필드로 지정해 의존 관계를 명시함', reviewPrompt: `다음 기능명세서에서 각 기능의 선행 조건과 의존 관계를 검토해줘.\nA 기능이 완료돼야 B 기능이 동작하는 경우를 모두 찾아서\n의존 순서가 누락된 부분을 구체적으로 지적해줘.\n[기능명세서 내용 붙여넣기]` },
           { id: 'f2', label: '핵심-부가 구분', status: '검토필요', reason: 'Must/Should/Could 우선순위 구분 없이 기능이 나열되어 있음', example: 'Notion은 Priority 컬럼을 기본 제공하고 P0·P1·P2로 등급을 나눔', reviewPrompt: `다음 기능명세서에서 핵심 기능과 부가 기능을 구분해줘.\nMVP에 반드시 필요한 기능과 나중에 추가해도 되는 기능을\n각각 이유와 함께 정리해줘.\n[기능명세서 내용 붙여넣기]` },
-          { id: 'f3', label: '엣지 케이스 정의', status: '미흡', reason: '오류 상황·예외 흐름에 대한 정의가 문서에 포함되어 있지 않음', example: 'Toss는 모든 기능명세서에 What-if 섹션을 의무화함', reviewPrompt: `다음 기능명세서에서 엣지 케이스가 정의되지 않은 기능을 찾아줘.\n네트워크 오류, 빈 상태, 권한 없음, 입력값 초과 등\n일반적인 엣지 케이스 유형 기준으로 빠진 부분을 목록으로 정리해줘.\n[기능명세서 내용 붙여넣기]` },
+          { id: 'f3', label: '엣지 케이스 정의', status: '검토필요', reason: '오류 상황·예외 흐름에 대한 정의가 문서에 포함되어 있지 않음', example: 'Toss는 모든 기능명세서에 What-if 섹션을 의무화함', reviewPrompt: `다음 기능명세서에서 엣지 케이스가 정의되지 않은 기능을 찾아줘.\n네트워크 오류, 빈 상태, 권한 없음, 입력값 초과 등\n일반적인 엣지 케이스 유형 기준으로 빠진 부분을 목록으로 정리해줘.\n[기능명세서 내용 붙여넣기]` },
         ],
         '유저플로우': [
           { id: 'u1', label: '진입 경로 수', status: '충족', reason: '소셜 로그인·이메일 가입 등 복수의 진입 경로가 플로우에 포함됨', example: '카카오는 직접 탐색·알림·공유 링크 3가지 진입 경로를 기본으로 포함함', reviewPrompt: `다음 유저플로우에서 서비스 진입 경로가 충분히 포함되어 있는지 검토해줘.\n직접 탐색, 알림, 공유 링크, 외부 유입 등 주요 진입 유형이 모두 커버되는지 확인하고\n누락된 진입 경로와 각 경로에서 달라져야 할 첫 화면을 구체적으로 제안해줘.\n[유저플로우 내용 붙여넣기]` },
@@ -657,6 +658,17 @@ export default function App() {
   };
 
   const recentCtxChatHistory = useMemo(() => ctxChatHistory.slice(-3), [ctxChatHistory]);
+
+  // 탭/요구사항/기능 변경 시 AI 에이전트 대화 초기화
+  useEffect(() => {
+    setCtxChatHistory([]);
+    setCtxChatInput('');
+  }, [activeTab, selectedReqId, selectedFeatId]);
+
+  // AI 에이전트 대화창 자동 스크롤
+  useEffect(() => {
+    ctxChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [ctxChatHistory]);
 
   // Multi-step auto-scroll to Chat Bottom
   useEffect(() => {
@@ -2688,7 +2700,7 @@ export default function App() {
                   '레이아웃 일관성': { description: '화면 간 버튼 위치·타이포그래피·간격이 일관된 디자인 시스템을 따르는지 검증 필요', points: ['버튼 크기·위치·색상 화면 간 통일성', '타이포그래피(폰트 크기·굵기·색상) 일관성', '여백(padding/margin) 규칙의 시스템화 여부'], prompts: ['다음 와이어프레임에서 화면 간 레이아웃 일관성을 검토해줘.\n통일해야 할 디자인 규칙을 구체적으로 제안해줘.\n[와이어프레임 설명 붙여넣기]', '다음 와이어프레임을 기반으로 기본 디자인 시스템을 정의해줘.\n실제 개발에 바로 사용할 수 있는 형태로 정리해줘.\n[와이어프레임 설명 붙여넣기]', 'Airbnb DLS, Toss Design System을 참고해서 즉시 개선해야 할 불일치 요소 Top 3를 제안해줘.\n[와이어프레임 설명 붙여넣기]'] },
                 };
 
-                const validStatuses2 = ['충족', '검토필요', '미흡'] as const;
+                const validStatuses2 = ['충족', '검토필요'] as const;
                 type SKey2 = typeof validStatuses2[number];
                 const researchItems = aiCriteria.filter(item => {
                   const cur: SKey2 = validStatuses2.includes(checklistStatus[item.id] as SKey2)
@@ -2696,7 +2708,7 @@ export default function App() {
                     : validStatuses2.includes(item.status as SKey2)
                     ? (item.status as SKey2)
                     : '검토필요';
-                  return cur === '검토필요' || cur === '미흡';
+                  return cur === '검토필요';
                 });
                 if (researchItems.length === 0) return null;
 
@@ -2788,8 +2800,8 @@ export default function App() {
                       </div>
                     ))
                   ) : aiCriteria.map((item) => {
-                    // API status 값(충족|검토필요|미흡)을 직접 사용, 수동 토글 우선 적용
-                    const validStatuses = ['충족', '검토필요', '미흡'] as const;
+                    // API status 값(충족|검토필요)을 직접 사용, 수동 토글 우선 적용
+                    const validStatuses = ['충족', '검토필요'] as const;
                     type StatusKey = typeof validStatuses[number];
                     const rawStatus: StatusKey = validStatuses.includes(checklistStatus[item.id] as StatusKey)
                       ? (checklistStatus[item.id] as StatusKey)
@@ -2798,10 +2810,8 @@ export default function App() {
                       : '검토필요';
                     const badgeStyle = rawStatus === '충족'
                       ? 'bg-green-100 text-green-700 border border-green-300'
-                      : rawStatus === '미흡'
-                      ? 'bg-red-100 text-red-700 border border-red-300'
                       : 'bg-yellow-100 text-yellow-700 border border-yellow-300';
-                    const badgeLabel = rawStatus === '충족' ? '✅ 충족' : rawStatus === '미흡' ? '🔴 미흡' : '🟡 검토필요';
+                    const badgeLabel = rawStatus === '충족' ? '✅ 충족' : '🟡 검토필요';
                     const isOpen = activeTooltip === item.id;
                     return (
                       <div key={item.id} className="flex items-start justify-between gap-2">
@@ -2809,12 +2819,8 @@ export default function App() {
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); setChecklistStatus(prev => {
-                              const cur: StatusKey = validStatuses.includes(prev[item.id] as StatusKey) ? (prev[item.id] as StatusKey) : rawStatus;
-                              const cycle: Record<StatusKey, StatusKey> = { '충족': '검토필요', '검토필요': '미흡', '미흡': '충족' };
-                              return { ...prev, [item.id]: cycle[cur] };
-                            }); }}
-                            className={`text-[9px] font-black px-1.5 py-0.5 rounded cursor-pointer transition-all duration-200 active:scale-95 whitespace-nowrap ${badgeStyle}`}
+                            onClick={(e) => { e.stopPropagation(); if (rawStatus === '충족') return; setChecklistStatus(prev => ({ ...prev, [item.id]: '충족' })); }}
+                            className={`text-[9px] font-black px-1.5 py-0.5 rounded transition-all duration-200 whitespace-nowrap ${badgeStyle} ${rawStatus === '충족' ? 'cursor-default' : 'cursor-pointer active:scale-95'}`}
                           >{badgeLabel}</button>
                           <button
                             type="button"
@@ -2862,10 +2868,10 @@ export default function App() {
                   <p className="text-[9px] text-gray-400 font-medium mt-0.5">현재 문서 기반으로 질문하세요</p>
                 </div>
                 <div className="max-h-36 overflow-y-auto px-3 pt-2 pb-1 space-y-2">
-                  {recentCtxChatHistory.length === 0 && (
+                  {ctxChatHistory.length === 0 && (
                     <p className="text-[10px] text-gray-400 font-medium text-center py-2">구성 기준이나 시장 데이터에 대해 질문하세요.</p>
                   )}
-                  {recentCtxChatHistory.map((msg, i) => (
+                  {ctxChatHistory.map((msg, i) => (
                     <div key={i} className={`text-[10.5px] leading-relaxed font-semibold px-2 py-1.5 rounded-lg ${msg.role === 'user' ? 'bg-purple-50 text-purple-800 text-right' : 'bg-gray-50 text-gray-700'}`}>
                       {msg.text}
                     </div>
@@ -2875,6 +2881,7 @@ export default function App() {
                       <span className="h-2 w-2 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" /> 답변 생성 중...
                     </div>
                   )}
+                  <div ref={ctxChatEndRef} />
                 </div>
                 <form onSubmit={handleContextChat} className="p-2 border-t border-gray-100 flex gap-2">
                   <input
